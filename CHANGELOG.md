@@ -49,6 +49,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **JaxAdaMuon reaches RMSE 0.198 in 5 s** — 2nd best overall and 13×
   faster than DEHybrid. Three loss basins are now resolved at κ ≈ 0.01,
   0.5 (≈ NEEMP ref), and 1.4–2.2.
+- `JaxAdaMuon` updated to mirror the official ``AdaMuonOfficial``
+  reference impl in ``mlxmolkit/tools/torch_optimizers.py`` (Apache-2.0):
+  Newton-Schulz quintic on ``sign(direction)`` with coefficients
+  (3.4445, -4.7750, 2.0315), shared β between 1st & 2nd moment, spectral
+  rescale by ``coeff·sqrt(r·c)/‖dir‖``. On our flat parameter vector the
+  NS step degenerates (no off-diagonal information), so we still keep
+  the naive L2-normalised variant available via lower ``ns_steps``.
+- **`DENewton`** solver — the missing bridge between `DEHybrid` (right κ
+  basin, expensive global search) and `AnalyticNewton` (Hessian-aware
+  but trapped at random start). Stage 1 = DE with 50-point LHS + 20
+  generations (~3 s) locates the κ ≈ 0.4-0.5 basin; stage 2 =
+  AnalyticNewton polish refines it via the analytical Hessian.
+  Benchmark on NEEMP set01 (30 mol):
+    DENewton:     RMSE 0.0557  wall 3.8s  κ = 0.372  ★ best overall
+    DEHybrid:     RMSE 0.0941  wall 59s   κ = 0.44
+    Speedup 15× over DEHybrid at 1.7× lower RMSE.
 
 ## [0.1.0a0] — 2026-05-22
 

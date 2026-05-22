@@ -15,6 +15,7 @@ from powelleem.solvers.analytic_newton import AnalyticNewton
 from powelleem.solvers.base import SolverConfig, Solver
 from powelleem.solvers.bobyqa import Bobyqa
 from powelleem.solvers.de_hybrid import DEHybrid
+from powelleem.solvers.de_newton import DENewton
 from powelleem.solvers.jax_adam import JaxAdam
 from powelleem.solvers.jax_adamuon import JaxAdaMuon
 from powelleem.solvers.jax_lm import JaxLM
@@ -31,4 +32,5 @@ __all__ = [
     "Newuoa",
     "Bobyqa",
     "DEHybrid",
+    "DENewton",
 ]

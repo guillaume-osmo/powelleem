@@ -1,35 +1,37 @@
-"""JaxAdaMuon solver — AdaMuon (Liu et al. 2025) in JAX.
+"""JaxAdaMuon solver — faithful port of AdaMuonOfficial (Liu et al. 2025).
 
-AdaMuon combines two ideas:
+Mirrors the reference PyTorch implementation found in
+``mlxmolkit/tools/torch_optimizers.py:AdaMuonOfficial`` (Apache-2.0):
 
-- **Muon** (Jordan 2024) replaces SGD's per-coordinate update with a
-  spectrally-normalised step. Concretely, the momentum buffer is fed
-  through Newton-Schulz iterations to approximate the polar/orthogonal
-  factor before being applied. The "step direction" is therefore a
-  unit-norm matrix (or unit-norm vector for non-matrix params).
-- **Ada** adds Adam-style per-coordinate adaptive scaling on top, using
-  the running second moment of the *raw* gradient ``g²``.
+1. Momentum buffer (Nesterov-style):  m ← μ·m + g;  direction = g + μ·m
+2. Newton-Schulz quintic on ``sign(direction)`` (5 steps by default)
+   with coefficients (a, b, c) = (3.4445, -4.7750, 2.0315). The matrix
+   is first L2-normalised so the iteration is in the contraction regime.
+3. Variance buffer on the *post-NS* direction:
+       v ← μ·v + (1−μ)·(d⊗d)
+4. ``flat = direction / (√v + ε)``
+5. Spectral rescale: direction · (s · √(r·c) / (‖direction‖ + ε))
+   with ``s = scale_coeff = 0.2`` and ``r, c`` being the matrix dims.
+6. ``x ← x − lr · direction``
 
-For a flat parameter vector ``x ∈ ℝ^P`` (our case: ``P = 1 + 2T`` for an
-EEM fit with ``T`` atom types), the Newton-Schulz iteration on a vector
-degenerates to a single L2-normalisation. The full update reads::
+For our flat 1+2T-dim parameter vector we reshape to ``(1, P)`` so the
+Newton-Schulz iteration runs on a degenerate 1×P matrix — that still
+orthogonalises via row-normalisation, which on a single row collapses
+to ``v / ‖v‖``. The quintic coefficients give a sharper polar
+approximation than a single L2-normalise.
 
-    g_t  = ∇L(x_{t-1})
-    m_t  = β1·m_{t-1} + (1-β1)·g_t         # 1st moment
-    v_t  = β2·v_{t-1} + (1-β2)·g_t²        # 2nd moment (element-wise)
-    m̂_t  = m_t / max(‖m_t‖₂, ε)            # Muon orthogonalisation (vector form)
-    v̂_t  = v_t / (1 − β2^t)                # Adam bias correction
-    x_t  = clip(x_{t-1} − η·m̂_t / (√v̂_t + ε), lo, hi)
-
-Compared to plain Adam, AdaMuon decouples the *direction* (purely
-momentum, L2-normalised) from the *magnitude* (Adam-style 1/√v scaling).
-Reported in the AdaMuon paper to converge faster than Adam on transformer
-training; for non-convex small-dim least-squares like ours it is
-essentially Lion-flavoured Adam.
+Reference
+---------
+- AdaMuonOfficial in ``mlxmolkit/tools/torch_optimizers.py`` (Guillaume's
+  fork, May 2026), itself faithful to:
+  Liu, Y. et al. *AdaMuon: Adaptive Muon Optimizer.* 2025.
+  Jordan, K. *Muon: An optimizer for hidden layers in neural networks.*
+  GitHub, 2024.
 """
 
 from __future__ import annotations
 
+import math
 import time
 from typing import TYPE_CHECKING
 
@@ -44,8 +46,28 @@ if TYPE_CHECKING:
     from powelleem.types import Dataset, FitResult
 
 
+# Newton-Schulz quintic coefficients used by common Muon implementations.
+_NS_A, _NS_B, _NS_C = 3.4445, -4.7750, 2.0315
+
+
+def _zeropower_newton_schulz_jax(matrix, steps: int, eps: float = 1e-7):  # type: ignore[no-untyped-def]
+    """Quintic Newton-Schulz iteration in JAX. ``matrix`` is shape (r, c)."""
+    import jax.numpy as jnp
+
+    transposed = matrix.shape[0] > matrix.shape[1]
+    if transposed:
+        matrix = matrix.T
+    matrix = matrix / (jnp.linalg.norm(matrix) + eps)
+    for _ in range(int(steps)):
+        gram = matrix @ matrix.T
+        matrix = _NS_A * matrix + (_NS_B * gram + _NS_C * (gram @ gram)) @ matrix
+    if transposed:
+        matrix = matrix.T
+    return matrix
+
+
 class JaxAdaMuon(Solver):
-    """AdaMuon (Adam + Muon orthogonalisation) implemented in JAX."""
+    """AdaMuon (Liu et al. 2025) in JAX, faithful to AdaMuonOfficial."""
 
     name = "JaxAdaMuon"
 
@@ -54,18 +76,22 @@ class JaxAdaMuon(Solver):
         config: SolverConfig | None = None,
         *,
         n_iterations: int = 1000,
-        learning_rate: float = 0.05,
-        beta1: float = 0.9,
-        beta2: float = 0.999,
+        learning_rate: float = 0.01,
+        momentum: float = 0.95,
         eps: float = 1e-8,
+        ns_steps: int = 5,
+        scale_coeff: float = 0.2,
+        nesterov: bool = True,
         clip_to_bounds: bool = True,
     ) -> None:
         super().__init__(config)
         self.n_iterations = n_iterations
         self.learning_rate = learning_rate
-        self.beta1 = beta1
-        self.beta2 = beta2
+        self.momentum = momentum
         self.eps = eps
+        self.ns_steps = ns_steps
+        self.scale_coeff = scale_coeff
+        self.nesterov = nesterov
         self.clip_to_bounds = clip_to_bounds
 
     def fit(
@@ -120,41 +146,48 @@ class JaxAdaMuon(Solver):
         hi_j = jnp.asarray(hi)
 
         x = jnp.asarray(x0)
+        P = x.shape[0]
         loss0 = float(loss_jit(x))
         trajectory: list[float] = [loss0]
 
-        b1, b2, eps = self.beta1, self.beta2, self.eps
-        m_state = jnp.zeros_like(x)
-        v_state = jnp.zeros_like(x)
+        mu = self.momentum
+        eps = self.eps
+        m_buf = jnp.zeros_like(x)
+        v_buf = jnp.zeros_like(x)
+
+        # For our (1, P) reshape, r = 1, c = P, so spectral rescale factor is
+        #   s · √(min(r,c)·max(r,c)) / (||direction|| + ε) = s · √P / (...)
+        rc_factor = math.sqrt(max(1, min(1, P)) * max(1, P))
 
         t0 = time.perf_counter()
-        for t in range(1, self.n_iterations + 1):
+        for _t in range(1, self.n_iterations + 1):
             g = grad_jit(x)
-            m_state = b1 * m_state + (1 - b1) * g
-            v_state = b2 * v_state + (1 - b2) * g * g
 
-            # Bias-correct
-            m_hat = m_state / (1 - b1 ** t)
-            v_hat = v_state / (1 - b2 ** t)
+            # 1. Momentum buffer + Nesterov-style direction
+            m_buf = mu * m_buf + g
+            direction_flat = g + mu * m_buf if self.nesterov else m_buf
 
-            # AdaMuon: Adam-scale the momentum *first*, then unit-normalise the
-            # resulting direction (Muon's polar step). This decouples the step
-            # *magnitude* (controlled by lr only) from the *direction* (which
-            # adaptively weights coordinates by their inverse-variance).
-            scaled = m_hat / (jnp.sqrt(v_hat) + eps)
-            direction = scaled / (jnp.linalg.norm(scaled) + eps)
+            # 2. Newton-Schulz quintic on sign(direction), reshaped to (1, P)
+            sign_dir = jnp.sign(direction_flat).reshape(1, -1)
+            polished = _zeropower_newton_schulz_jax(sign_dir, self.ns_steps, eps=1e-7)
+            direction_flat = polished.reshape(-1)
 
-            # Scale by lr and sqrt(P) so the per-coordinate step magnitude is
-            # comparable to Adam's effective per-coordinate step (Adam: lr per
-            # coordinate; AdaMuon: lr * sqrt(P) / P = lr/sqrt(P) per coordinate
-            # without the rescale, restored here).
-            step = self.learning_rate * jnp.sqrt(direction.size) * direction
+            # 3. Variance buffer on post-NS direction (shared β with momentum)
+            v_buf = mu * v_buf + (1.0 - mu) * direction_flat * direction_flat
 
-            x = x - step
+            # 4. Adam-style 1/√v scaling
+            direction_flat = direction_flat / (jnp.sqrt(v_buf) + eps)
+
+            # 5. Spectral rescale
+            scale = self.scale_coeff * rc_factor / (jnp.linalg.norm(direction_flat) + eps)
+            direction_flat = direction_flat * scale
+
+            # 6. Param update
+            x = x - self.learning_rate * direction_flat
             if self.clip_to_bounds:
                 x = jnp.clip(x, lo_j, hi_j)
 
-            if t % 50 == 0:
+            if _t % 50 == 0:
                 trajectory.append(float(loss_jit(x)))
         wall = time.perf_counter() - t0
 
@@ -173,10 +206,10 @@ class JaxAdaMuon(Solver):
             solver_metadata={
                 "n_iterations": self.n_iterations,
                 "learning_rate": self.learning_rate,
-                "beta1": self.beta1,
-                "beta2": self.beta2,
-                "eps": self.eps,
-                "clip_to_bounds": self.clip_to_bounds,
+                "momentum": self.momentum,
+                "ns_steps": self.ns_steps,
+                "scale_coeff": self.scale_coeff,
+                "nesterov": self.nesterov,
             },
             wall_time_s=wall,
             n_function_evals=self.n_iterations,
