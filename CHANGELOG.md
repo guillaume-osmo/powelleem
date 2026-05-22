@@ -4,7 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] — 2026-05-23
+
+### Headline result
+- **`powelleem` improves on Raček 2016 NEEMP CCD_gen by 11.4 % RMSD on
+  set03 (17,769 mol, 821,418 atoms).** Same loss formulation, same training
+  data, but the trust-Newton polish with the analytical Hessian (via the
+  implicit function theorem) lands at a strictly better basin than NEEMP's
+  DE + NEWUOA derivative-free pipeline. End-to-end wall: **146 s** vs
+  estimated ~10-20 h for the original MATLAB `DE_UOA_FINAL.m` run.
+
+  Side-by-side (set03, full 17,769 mol, mol-RMSD loss):
+
+  |                | powelleem | Raček 2016 | Δ |
+  |---|---:|---:|---:|
+  | κ              | 0.2627    | 0.5125     | (different basin) |
+  | mol-RMSD       | 0.0574    | 0.0648     | −11.4 % |
+  | R              | 0.9876    | 0.9846     | +0.3 % |
+  | R²             | 0.9754    | 0.9696     | +0.6 % |
+  | D_max          | 0.1714    | 0.2219     | −22.8 % |
+  | wall (set03)   | 146 s     | ~10-20 h   | ~250-500× |
 
 ### Fixed
 - Switched `Newuoa`/`Bobyqa`/`DEHybrid` from non-existent `prima.minimize`

@@ -2,11 +2,37 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
-[![Status](https://img.shields.io/badge/status-alpha-orange)]()
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)]()
+[![Status](https://img.shields.io/badge/status-beta-yellow)]()
+[![CI](https://github.com/guillaume-osmo/powelleem/actions/workflows/ci.yml/badge.svg)](https://github.com/guillaume-osmo/powelleem/actions)
 
 **Modern Python port of the EEM parameter-fitting MATLAB pipeline (Godin 2017–2023),
-with analytical Jacobian via the implicit function theorem and a uniform API
-over six solvers including Powell's NEWUOA/BOBYQA.**
+with analytical Jacobian & Hessian via the implicit function theorem,
+JIT-parallel Numba kernels, and a uniform API over ten solvers including
+Powell's NEWUOA/BOBYQA.**
+
+> **Headline result.** Fitting NEEMP set03 (17,769 molecules, 821,418 atoms,
+> 15 atom types, B3LYP/6-311G NPA reference charges), `powelleem` produces a
+> **mol-RMSD of 0.0574** vs Raček 2016's published **0.0648** — an **11.4 %
+> improvement** on the reference NEEMP CCD_gen result, in **146 seconds**
+> wall time (vs ~10-20 h for the original MATLAB DE+NEWUOA pipeline).
+
+| Metric (set03, mol-RMSD loss) | `powelleem` | Raček 2016 | Δ |
+|---|---:|---:|---:|
+| κ                | 0.2627    | 0.5125    | (different basin) |
+| **mol-RMSD**     | **0.0574** | 0.0648    | **−11.4 %** |
+| R                | 0.9876    | 0.9846    | +0.3 % |
+| R²               | 0.9754    | 0.9696    | +0.6 % |
+| Sp (Spearman)    | 0.9462    | 0.9472    | ≈     |
+| D_avg            | 0.0428    | 0.0449    | −4.7 % |
+| D_max            | 0.1714    | 0.2219    | −22.8 % |
+| wall (full set03)| 146 s     | ~10-20 h  | ~250–500× |
+
+The improvement comes from replacing NEEMP's derivative-free NEWUOA polish
+(quadratic interpolation of the Hessian) with the **exact analytical
+Hessian** computed via two applications of the implicit function theorem;
+near the basin minimum Newton converges quadratically, dropping into a
+strictly better local minimum.
 
 The Electronegativity Equalization Method (EEM, Mortier 1986) predicts atomic
 partial charges from per-element parameters (electronegativity α, hardness β,
@@ -102,16 +128,22 @@ implicit function theorem:
 
 See [docs/theory.md](docs/theory.md) for the full derivation.
 
-## Why six solvers
+## Why ten solvers
 
 | Solver | Strategy | Best for |
 |---|---|---|
-| `AnalyticLM` | NumPy + analytic ∂q/∂x + L-BFGS-B → TRF/LM | small-to-medium problems, **fastest + most accurate** |
-| `Newuoa` | Powell trust-region, derivative-free | matches MATLAB reference exactly |
+| `AnalyticLM` | NumPy + analytic ∂q/∂x + L-BFGS-B → TRF/LM | small-to-medium problems, fastest single-start |
+| `AnalyticNewton` | + analytic full Hessian + trust-exact Newton | curvature-aware single-start |
+| `Newuoa` | Powell trust-region, derivative-free | matches MATLAB DE_UOA reference exactly |
 | `Bobyqa` | Powell with bound constraints | NEWUOA + native bounds |
 | `JaxAdam` | JAX autodiff + Adam | scales to thousands of params |
+| `JaxAdaMuon` | Adam + Newton-Schulz orthogonalisation | per Liu et al. 2025 |
+| `JaxMuonN` | nested AdamN + NS-on-direction | Guillaume's AdaMuonn variant |
 | `JaxLM` | JAX autodiff + L-BFGS-B → TRF | when analytic Jacobian impractical |
 | `DEHybrid` | DE outer + NEWUOA polish | matches `DE_UOA_FINAL.m` byte-for-byte |
+| `DENewton` | DE outer + AnalyticNewton polish | best RMSE × speed trade-off |
+| `DEAdaMuonn` | DE outer + JaxMuonN polish | AdaMuonn variant of above |
+| **`NumbaDENewton`** | DENewton with @njit(parallel=True) kernels | **production fits at scale** |
 
 ## Origin & references
 

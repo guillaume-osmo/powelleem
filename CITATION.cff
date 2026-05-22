@@ -5,8 +5,8 @@ message: >-
   is directly inspired by NEEMP.
 type: software
 title: 'powelleem: EEM parameter fitting with analytical Jacobian and Powell solvers'
-version: 0.1.0a0
-date-released: '2026-05-22'
+version: 0.2.0
+date-released: '2026-05-23'
 authors:
   - family-names: Godin
     given-names: Guillaume
@@ -94,4 +94,4 @@ preferred-citation:
     - family-names: Godin
       given-names: Guillaume
   year: 2026
-  version: 0.1.0a0
+  version: 0.2.0

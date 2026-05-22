@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "powelleem"
-version = "0.1.0a0"
+version = "0.2.0"
 description = "Electronegativity Equalization Method (EEM) parameter fitting — modern Python port of Godin's MATLAB DE+NEWUOA pipeline, with analytical Jacobian + multiple solvers"
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,7 @@ keywords = [
     "Levenberg-Marquardt", "molecular descriptors", "RDKit", "MMFF94",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
