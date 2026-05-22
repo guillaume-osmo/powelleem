@@ -1,0 +1,15 @@
+Loading CHAOS iodine subset (cached, all 763)…
+  763 mols, 13042 atoms, 16 types: ('H', 'B', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl', 'Z32', 'As', 'Se', 'Br', 'Z49', 'I')
+  Iodine atoms: 857
+  train: 611 mols   test: 152 mols
+OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+
+=== mol_rmsd ===  κ=0.2840 wall=3.2s
+  α(I)=2.7554  β(I)=0.5881
+  TRAIN: RMSD=0.0923  R=0.8681  D_avg=0.0686
+  TEST : RMSD=0.1053  R=0.8648  D_avg=0.0763  Δrmsd=+14.0%
+
+=== atom_rmse ===  κ=0.1031 wall=1.7s
+  α(I)=2.4712  β(I)=0.1280
+  TRAIN: RMSD=0.0950  R=0.8672  D_avg=0.0716
+  TEST : RMSD=0.1135  R=0.8634  D_avg=0.0799  Δrmsd=+19.5%

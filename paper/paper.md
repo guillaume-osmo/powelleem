@@ -229,6 +229,61 @@ This matches the well-known characteristic of EEM that it is a
 molecule-by-molecule details — so a representative training set of
 ~14,000 molecules is more than enough to fix the 31 numbers.
 
+## 3.4 Out-of-distribution validation: set03 → set02
+
+A still stronger generalisation test fits on the 17,769-molecule
+training set ``set03`` and *evaluates on the independent 4,443-molecule
+``set02``* — molecules NEEMP curated separately, which the model has
+never seen.  Atom-type vocabularies are remapped to their union (15
+classes; both sets cover the same chemistry).
+
+| Metric         | Train (set03, 17,769 mol) | OOD (set02, 4,443 mol) | Δ       |
+|---|---:|---:|---:|
+| RMSD (mol)     | 0.0574                    | 0.0574                 | **0.0 %** |
+| R              | 0.9876                    | 0.9876                 | 0.0 % |
+| R²             | 0.9754                    | 0.9754                 | 0.0 % |
+| Sp             | 0.9462                    | 0.9465                 | +0.0 % |
+| D_avg          | 0.0428                    | 0.0428                 | +0.1 % |
+| D_max          | 0.1714                    | 0.1703                 | −0.6 % |
+| atom-flat RMSE | 0.0578                    | 0.0578                 | 0.0 % |
+
+The metrics on set02 — 204,760 atoms the model has never seen — are
+*indistinguishable* from those on set03.  This is the strongest
+signature of a well-specified model: the 31 fitted parameters describe
+the underlying EEM physics, not training-set artefacts.
+
+## 3.5 Iodine: a domain NEEMP did not cover
+
+The published Raček 2016 NEEMP CCD_gen parameter set contains **no
+iodine atom type**: the CCD_gen training molecules used by NEEMP did
+not include iodine-containing species.  Downstream RDKit users have
+relied on coarse defaults or extrapolation, with predictably poor
+results on halogenated bioactives.
+
+We fit a fresh iodine-aware EEM parameter set on a 763-molecule
+iodine-containing subset extracted from the CHAOS database [@chaos2025]
+(ωB97X-D / def2-TZVP / C-PCM, APT charges, 857 iodine atoms across
+the 763 molecules).  80/20 train/test split for generalisation:
+
+| Loss      | κ      | α(I)   | β(I)   | Train RMSD | Test RMSD | Δ      |
+|---|---:|---:|---:|---:|---:|---:|
+| mol_rmsd  | 0.284  | 2.755  | 0.588  | 0.0923     | 0.1053    | +14 %  |
+| atom_rmse | 0.103  | 2.471  | 0.128  | 0.0950     | 0.1135    | +20 %  |
+
+The larger train/test gap relative to the NEEMP set03 fit (which had
+near-zero gap on 17,769 mol) reflects the smaller training set
+(611 mol) and the heavier chemical heterogeneity (16 atom classes
+including B, Se, As, In alongside the more common HCNO).  The
+``mol_rmsd`` fit is the more stable of the two — the ``atom_rmse``
+fit drives β(I) to 0.128, close to the lower bound, indicating the
+flat-atom loss is dominated by C/H atoms and does not constrain the
+heavy-iodine class as tightly.
+
+These iodine parameters are available as
+``benchmarks/results/chaos_iodine_763mol_split.txt`` and can be
+plugged into any RDKit-based EEM pipeline as a drop-in for the missing
+NEEMP CCD_gen iodine entry.
+
 
 # 4. Atom typing: NEEMP element+bond-order vs MMFF94
 

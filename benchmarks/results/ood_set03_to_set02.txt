@@ -1,3 +1,38 @@
 Loading set03 (NEEMP training, 17,769 mol)…
   set03: 17769 mols, 821418 atoms, 15 types
 Loading set02 (NEEMP OOD test, 4,443 mol)…
+[22:31:24] Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D.
+[22:31:34] Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D.
+[22:31:41] Warning: molecule is tagged as 2D, but at least one Z coordinate is not zero. Marking the mol as 3D.
+  set02: 4443 mols, 204760 atoms, 15 types
+
+Union atom-type vocabulary (15 types): ('Br-1', 'C-1', 'C-2', 'C-3', 'Cl-1', 'F-1', 'H-1', 'N-1', 'N-2', 'N-3', 'O-1', 'O-2', 'P-2', 'S-1', 'S-2')
+  set03 remapped: 17769 mols (skipped 0)
+  set02 remapped: 4443 mols (skipped 0)
+
+--- Fitting on set03 with loss=atom_rmse ---
+OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+  fit wall: 91.3s, κ=0.4278
+
+=== loss=atom_rmse: train(set03) vs OOD(set02) ===
+  metric          train(set03)      OOD(set02)    Δ%
+  rmsd                  0.0579          0.0579    -0.0 %
+  r                     0.9871          0.9870    -0.0 %
+  r2                    0.9744          0.9743    -0.0 %
+  sp                    0.9453          0.9454    +0.0 %
+  d_avg                 0.0431          0.0431    +0.2 %
+  d_max                 0.1743          0.1733    -0.6 %
+  atom_rmse             0.0581          0.0581    -0.0 %
+
+--- Fitting on set03 with loss=mol_rmsd ---
+  fit wall: 133.4s, κ=0.2627
+
+=== loss=mol_rmsd: train(set03) vs OOD(set02) ===
+  metric          train(set03)      OOD(set02)    Δ%
+  rmsd                  0.0574          0.0574    -0.0 %
+  r                     0.9876          0.9876    -0.0 %
+  r2                    0.9754          0.9754    -0.0 %
+  sp                    0.9462          0.9465    +0.0 %
+  d_avg                 0.0428          0.0428    +0.1 %
+  d_max                 0.1714          0.1703    -0.6 %
+  atom_rmse             0.0578          0.0578    -0.0 %
