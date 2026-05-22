@@ -40,6 +40,7 @@ dependencies = [
 
 [project.optional-dependencies]
 jax = ["jax>=0.4.30", "jaxlib>=0.4.30"]
+torch = ["torch>=2.5"]
 powell = ["pdfo>=2.0"]
 rdkit = ["rdkit>=2024.03.1"]
 chaos = ["rdkit>=2024.03.1"]
