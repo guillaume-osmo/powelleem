@@ -100,20 +100,16 @@ class NumbaDENewton(Solver):
         def eval_fitness(x: NDArray[np.float64]) -> float:
             """Compute the DE fitness value matching ``self.loss_kind``.
 
-            For atom-flat RMSE we just use the flat sqrt(mean(r²)).
-            For mol-RMSD we average per-molecule RMSDs.
+            Vectorised — relies on ``np.add.reduceat`` for the per-molecule
+            sums so we stay multi-threaded through BLAS / SIMD rather than
+            grinding through a Python loop over 17K molecules.
             """
             r = residuals_only_numba(x, nd)
             if self.loss_kind == "mol_rmsd":
-                # Avg of per-mol RMSDs — matches NEEMP's DE_RMSD objective.
-                offset = 0
-                s_sum = 0.0
-                for m in range(nd.n_atoms.shape[0]):
-                    n_m = int(nd.n_atoms[m])
-                    rm = r[offset : offset + n_m]
-                    offset += n_m
-                    s_sum += float(np.sqrt((rm * rm).mean()))
-                return s_sum / nd.n_atoms.shape[0]
+                r_sq = r * r
+                sums = np.add.reduceat(r_sq, nd.atom_offsets[:-1])
+                rmsd_per_mol = np.sqrt(sums / nd.n_atoms.astype(np.float64))
+                return float(rmsd_per_mol.mean())
             return float(np.sqrt((r * r).mean()))
 
         # ----- Stage 1: DE global search (residuals-only Numba) -----

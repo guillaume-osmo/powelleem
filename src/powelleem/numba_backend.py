@@ -641,22 +641,25 @@ def _aggregate_loss(
         return loss, grad, H
 
     if loss_kind == "mol_rmsd":
-        H = np.zeros((P, P), dtype=np.float64)
-        grad = np.zeros(P, dtype=np.float64)
-        loss_sum = 0.0
-        for m in range(M):
-            n_m = int(n_atoms[m])
-            start = int(atom_offsets[m])
-            r_m = r[start : start + n_m]
-            mse_m = float((r_m * r_m).sum() / n_m)
-            s_m = float(np.sqrt(mse_m)) + eps
-            loss_sum += s_m
-            JtR_m = JtR_per_mol[m]
-            inv_ns = 1.0 / (n_m * s_m)
-            grad += inv_ns * JtR_m
-            H += inv_ns * (JtJ_per_mol[m] + second_corr_per_mol[m])
-            H -= (1.0 / (n_m * n_m * s_m * s_m * s_m)) * np.outer(JtR_m, JtR_m)
-        return loss_sum / M, grad / M, H / M
+        # Fully vectorised NumPy aggregation — every operation goes through
+        # BLAS / SIMD so we keep the multi-core throughput we earned from
+        # the JIT-parallel Numba kernel above.
+        r_sq = r * r  # (N_atoms,)
+        sums_per_mol = np.add.reduceat(r_sq, atom_offsets[:-1])  # (M,)
+        mses = sums_per_mol / n_atoms.astype(np.float64)
+        s = np.sqrt(mses) + eps  # per-mol RMSDs
+        loss = float(s.mean())
+        n_f = n_atoms.astype(np.float64)
+        inv_ns = 1.0 / (n_f * s)  # (M,)
+        # grad : sum over mols of inv_ns[m] · JtR_per_mol[m]
+        grad = (inv_ns[:, None] * JtR_per_mol).sum(axis=0)
+        # H_term1 : sum_m inv_ns[m] · (JtJ + sc)[m]
+        H1 = (inv_ns[:, None, None] * (JtJ_per_mol + second_corr_per_mol)).sum(axis=0)
+        # H_term2 : sum_m (1/(n_m² s_m³)) · JtR_m ⊗ JtR_m
+        scale2 = 1.0 / (n_f * n_f * s * s * s)
+        H2 = np.einsum("m,mp,mq->pq", scale2, JtR_per_mol, JtR_per_mol)
+        H = (H1 - H2) / M
+        return loss, grad / M, H
 
     raise ValueError(f"unknown loss_kind: {loss_kind!r}")
 
