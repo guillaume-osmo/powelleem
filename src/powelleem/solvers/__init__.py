@@ -22,6 +22,7 @@ from powelleem.solvers.jax_adamuon import JaxAdaMuon
 from powelleem.solvers.jax_lm import JaxLM
 from powelleem.solvers.jax_muonn import JaxMuonN
 from powelleem.solvers.newuoa import Newuoa
+from powelleem.solvers.numba_denewton import NumbaDENewton
 
 __all__ = [
     "Solver",
@@ -37,4 +38,5 @@ __all__ = [
     "DEHybrid",
     "DENewton",
     "DEAdaMuonn",
+    "NumbaDENewton",
 ]
