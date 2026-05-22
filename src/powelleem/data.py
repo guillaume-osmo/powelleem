@@ -427,6 +427,7 @@ def load_neemp(
     limit: int | None = None,
     cache_dir: str | Path | None = _DEFAULT_CACHE_DIR,
     use_cache: bool = True,
+    aromatic_to_double: bool = True,
 ) -> Dataset:
     """Load a NEEMP-format dataset: SDF + ``.chg`` + ``.typ`` triplet.
 
@@ -495,7 +496,13 @@ def load_neemp(
         if limit is not None and len(raw) >= limit:
             break
 
-    type_strs = tuple(sorted({f"{e}-{b}" for e, b in seen_types}))
+    def _bo_remap(b: str) -> str:
+        """NEEMP-style bond-order coarsening: aromatic (1.5) → double (2)."""
+        if aromatic_to_double and b in ("1.5", "1.5 "):
+            return "2"
+        return b
+
+    type_strs = tuple(sorted({f"{e}-{_bo_remap(b)}" for e, b in seen_types}))
     type_idx = {t: i + 1 for i, t in enumerate(type_strs)}
 
     molecules: list[MoleculeData] = []
@@ -504,7 +511,7 @@ def load_neemp(
             MoleculeData(
                 smiles="",  # SDF doesn't carry SMILES — could re-compute with Chem.MolToSmiles
                 atom_types=np.asarray(
-                    [type_idx[f"{e}-{b}"] for e, b in atype_meta], dtype=np.int64
+                    [type_idx[f"{e}-{_bo_remap(b)}"] for e, b in atype_meta], dtype=np.int64
                 ),
                 inv_r=_build_inv_r(coords),
                 target_charges=q_ref,

@@ -3,3 +3,9 @@ Loading NEEMP set03 (limit=17769)…
 
 --- pop= 50 gen= 30 seed=42 ---
 OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+  RMSE = 0.05411    κ = 0.4513    wall = 227.2s   (DE 124s + Newton 98s)
+--- pop= 50 gen= 30 seed=43 ---
+  RMSE = 0.05415    κ = 0.4520    wall = 200.3s   (DE 116s + Newton 80s)
+--- pop= 50 gen= 30 seed=44 ---
+  RMSE = 0.05412    κ = 0.4484    wall = 181.3s   (DE 124s + Newton 53s)
+--- pop=100 gen= 50 seed=42 ---
