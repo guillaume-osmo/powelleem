@@ -1,0 +1,14 @@
+Loading NEEMP set03 (limit=17769)…
+Traceback (most recent call last):
+  File "/Users/guillaume-osmo/Github/powelleem/examples/05_scale_numpy.py", line 158, in <module>
+    main(set_id=args.set, n_mols=args.n_mols, seed=args.seed, skip_dehybrid=args.skip_dehybrid)
+  File "/Users/guillaume-osmo/Github/powelleem/examples/05_scale_numpy.py", line 62, in main
+    ds = load_neemp(sdf, chg, typ, limit=n_mols, name=f"NEEMP-set{set_id}-{n_mols}")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guillaume-osmo/Github/powelleem/src/powelleem/data.py", line 270, in load_neemp
+    charges_by_name = _parse_neemp_chg(chg_path)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/guillaume-osmo/Github/powelleem/src/powelleem/data.py", line 198, in _parse_neemp_chg
+    n = int(lines[i].strip())
+        ^^^^^^^^^^^^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: 'NAME:001'

@@ -177,25 +177,47 @@ def _z_to_symbol(z: int) -> str:
 def _parse_neemp_chg(path: Path) -> dict[str, NDArray[np.float64]]:
     """Parse a NEEMP ``.chg`` file.
 
-    Format (one block per molecule)::
+    Two block layouts are supported:
 
-        NSC_100000           ← mol name
-        29                    ← number of atoms
+    Layout A (set01/set02)::
+
+        NSC_100000           ← mol name (bare token)
+        29                   ← number of atoms
              1  N   -0.812377
-             2  O   -0.510019
              ...
+
+    Layout B (set03, with ``$$$$`` separators)::
+
+        NAME:000             ← mol name (may contain ':')
+        9
+             1  C    0.97509
+             ...
+        $$$$                 ← record terminator
+        NAME:001
+        ...
     """
     out: dict[str, NDArray[np.float64]] = {}
     with path.open() as fh:
         lines = fh.read().splitlines()
     i = 0
     while i < len(lines):
-        if not lines[i].strip():
+        line = lines[i].strip()
+        if not line or line == "$$$$":
             i += 1
             continue
-        name = lines[i].strip()
+        # Normalise: strip "NAME:" prefix (set03) so chg/typ keys match SDF names.
+        name = line.split(":", 1)[1].strip() if line.upper().startswith("NAME:") else line
         i += 1
-        n = int(lines[i].strip())
+        # Next non-blank, non-separator line is the atom count, optionally
+        # prefixed with "NATO:" (set03 uses both ``9`` and ``NATO:53`` forms).
+        while i < len(lines) and (not lines[i].strip() or lines[i].strip() == "$$$$"):
+            i += 1
+        if i >= len(lines):
+            break
+        raw_n = lines[i].strip()
+        if raw_n.upper().startswith("NATO:"):
+            raw_n = raw_n.split(":", 1)[1].strip()
+        n = int(raw_n)
         i += 1
         charges = np.empty(n, dtype=np.float64)
         for j in range(n):
@@ -209,12 +231,22 @@ def _parse_neemp_chg(path: Path) -> dict[str, NDArray[np.float64]]:
 def _parse_neemp_typ(path: Path) -> dict[str, list[tuple[str, str]]]:
     """Parse a NEEMP ``.typ`` file.
 
-    Format per mol block::
+    Two layouts supported:
 
-        NSC_100000
+    Layout A (set01/set02)::
+
+        NSC_100000              ← bare token
            1   N   1
            2   O   2
            ...
+
+    Layout B (set03, count line + ``$$$$`` separator)::
+
+        NAME:000
+        9                       ← atom count (skipped during parse)
+           1   C   2
+           ...
+        $$$$
 
     The third column is the bond-order class (1 for single, 2 for double,
     1.5 for aromatic, 3 for triple).
@@ -224,15 +256,32 @@ def _parse_neemp_typ(path: Path) -> dict[str, list[tuple[str, str]]]:
         lines = fh.read().splitlines()
     i = 0
     while i < len(lines):
-        if not lines[i].strip():
+        line = lines[i].strip()
+        if not line or line == "$$$$":
             i += 1
             continue
-        name = lines[i].strip()
+        # Normalise: strip "NAME:" prefix (set03)
+        name = line.split(":", 1)[1].strip() if line.upper().startswith("NAME:") else line
         i += 1
         atoms: list[tuple[str, str]] = []
-        while i < len(lines) and lines[i].strip() and not lines[i].lstrip()[0].isalpha():
-            parts = lines[i].split()
-            # parts[0] = atom_idx (1-based), parts[1] = element, parts[2] = bond-order class
+        while i < len(lines):
+            row = lines[i].strip()
+            if not row:
+                i += 1
+                continue
+            if row == "$$$$":
+                break
+            parts = row.split()
+            # Skip optional atom-count line ("9" or "NATO:53")
+            if len(parts) == 1 and (
+                parts[0].isdigit() or parts[0].upper().startswith("NATO:")
+            ):
+                i += 1
+                continue
+            # An atom-row has ≥ 3 fields and starts with an integer index.
+            if len(parts) < 3 or not parts[0].lstrip("-").isdigit():
+                # Next molecule's name; break (don't consume).
+                break
             atoms.append((parts[1], parts[2]))
             i += 1
         out[name] = atoms
