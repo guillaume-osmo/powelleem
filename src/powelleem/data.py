@@ -418,6 +418,163 @@ def _load_dataset_npz(path: Path) -> Dataset:
     )
 
 
+_CHAOS_CACHE_DIR = Path.home() / ".cache" / "powelleem" / "chaos"
+
+
+def _chaos_cache_key(
+    zip_path: Path,
+    n_mols: int | None,
+    target: str,
+    contains_element: int | None,
+    max_n_atoms: int,
+) -> str:
+    import hashlib
+
+    st = zip_path.stat()
+    h = hashlib.blake2b(digest_size=16)
+    h.update(str(zip_path).encode())
+    h.update(str(st.st_size).encode())
+    h.update(f"{n_mols}|{target}|{contains_element}|{max_n_atoms}".encode())
+    return h.hexdigest()
+
+
+def load_chaos(
+    zip_path: str | Path,
+    *,
+    n_mols: int | None = None,
+    max_n_atoms: int = 50,
+    target: str = "apt",
+    contains_element: int | None = None,
+    skip_non_converged: bool = True,
+    name: str = "CHAOS",
+    cache_dir: str | Path | None = _CHAOS_CACHE_DIR,
+    use_cache: bool = True,
+) -> Dataset:
+    """Load a CHAOS subset (Computed High-Accuracy Observables and Sigma-profiles).
+
+    CHAOS (Raček-independent, 53,091 mols, ωB97X-D / def2-TZVP + C-PCM) ships
+    atomic charges (Mulliken, APT) plus per-atom COSMO surface charges in
+    one JSON per molecule. We extract:
+
+    - ``structural.Coordinates``     → atom xyz (Å), for inv_r
+    - ``general.AtomList``           → element + atomic_number per atom
+    - ``electronic.PartChargeAPT``   → target ``target="apt"``  (default)
+    - ``electronic.PartChargeMulliken`` → target ``target="mulliken"``
+    - ``solvation.AtomCOSMOCharge``  → target ``target="cosmo"`` (≈ COSMO-screened)
+
+    ``contains_element=53`` filters to iodine-containing molecules only — useful
+    for fitting an iodine-specific EEM parameter set (NEEMP CCD_gen did not
+    include iodine).
+
+    NPZ cache: ``~/.cache/powelleem/chaos/<hash>.npz`` (saves the ~minutes of
+    ZIP streaming + JSON parsing).
+    """
+    zip_path = Path(zip_path)
+    if not zip_path.exists():
+        raise FileNotFoundError(zip_path)
+
+    if use_cache and cache_dir is not None:
+        key = _chaos_cache_key(zip_path, n_mols, target, contains_element, max_n_atoms)
+        cp = Path(cache_dir) / f"{key}.npz"
+        if cp.exists():
+            return _load_dataset_npz(cp)
+    else:
+        cp = None  # type: ignore[assignment]
+
+    import json
+    import zipfile
+
+    raw: list[tuple[str, NDArray[np.float64], NDArray[np.int64], NDArray[np.float64], int]] = []
+    seen_Z: set[int] = set()
+
+    with zipfile.ZipFile(zip_path) as zf:
+        names = sorted((n for n in zf.namelist() if n.endswith(".json")),
+                       key=lambda n: int(Path(n).stem))
+        for member in names:
+            with zf.open(member) as fh:
+                entry = json.loads(fh.read())
+            if skip_non_converged and entry["general"].get("not_converged"):
+                continue
+            atoms = entry["general"]["AtomList"]
+            n = len(atoms)
+            if n > max_n_atoms:
+                continue
+            atomic_nums = np.asarray([a["atomic_number"] for a in atoms], dtype=np.int64)
+            if contains_element is not None and contains_element not in atomic_nums:
+                continue
+            coords = np.asarray(entry["structural"]["Coordinates"], dtype=np.float64)
+            if coords.shape != (n, 3):
+                continue
+            try:
+                if target == "apt":
+                    q = np.asarray(entry["electronic"]["PartChargeAPT"], dtype=np.float64)
+                elif target == "mulliken":
+                    q = np.asarray(entry["electronic"]["PartChargeMulliken"], dtype=np.float64)
+                elif target == "cosmo":
+                    cs = entry["solvation"]["AtomCOSMOCharge"]
+                    q = np.asarray([a["charge"] for a in cs], dtype=np.float64)
+                else:
+                    raise ValueError(f"unknown CHAOS target: {target!r}")
+            except (KeyError, TypeError):
+                continue
+            if q.shape[0] != n:
+                continue
+            formal_q = int(entry["electronic"].get("Charge", 0))
+            mol_name = Path(member).stem
+            seen_Z.update(int(z) for z in atomic_nums)
+            raw.append((mol_name, coords, atomic_nums, q, formal_q))
+            if n_mols is not None and len(raw) >= n_mols:
+                break
+
+    sorted_Z = sorted(seen_Z)
+    z_to_type_idx = {z: i + 1 for i, z in enumerate(sorted_Z)}
+    type_strs = tuple(_z_to_symbol(z) for z in sorted_Z)
+
+    molecules: list[MoleculeData] = []
+    for mol_name, coords, atomic_nums, q, formal_q in raw:
+        type_idx = np.asarray([z_to_type_idx[int(z)] for z in atomic_nums], dtype=np.int64)
+        molecules.append(
+            MoleculeData(
+                smiles="",
+                atom_types=type_idx,
+                inv_r=_build_inv_r(coords),
+                target_charges=q,
+                formal_charge=float(formal_q),
+                metadata={"source": "CHAOS", "name": mol_name, "target": target},
+            )
+        )
+
+    ds = Dataset(
+        molecules=molecules,
+        atom_types=type_strs,
+        name=name,
+        metadata={
+            "source": "CHAOS",
+            "zip": str(zip_path),
+            "target": target,
+            "contains_element": str(contains_element),
+            "n_loaded": len(molecules),
+            "level_of_theory": "ωB97X-D/def2-TZVP + C-PCM",
+        },
+    )
+    if cp is not None:
+        try:
+            _save_dataset_npz(ds, cp)
+        except Exception:
+            pass
+    return ds
+
+
+def _z_to_symbol(z: int) -> str:
+    symbols = {
+        1: "H", 5: "B", 6: "C", 7: "N", 8: "O", 9: "F",
+        14: "Si", 15: "P", 16: "S", 17: "Cl", 35: "Br", 53: "I",
+        33: "As", 34: "Se", 11: "Na", 19: "K", 20: "Ca", 12: "Mg",
+        26: "Fe", 29: "Cu", 30: "Zn",
+    }
+    return symbols.get(z, f"Z{z}")
+
+
 def load_neemp(
     sdf_path: str | Path,
     chg_path: str | Path,
