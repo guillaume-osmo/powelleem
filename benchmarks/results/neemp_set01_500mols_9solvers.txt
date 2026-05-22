@@ -1,0 +1,2 @@
+/Users/guillaume-osmo/miniconda3/envs/osmo/lib/python3.11/site-packages/pdfo/_common.py:2512: Warning: prepdfo: x0 is revised so that the distance between x0 and the inactive bounds is at least radius_init; set options[Options.HONOUR_X0.value]=True if you prefer to keep x0.
+  warnings.warn(warn_message, Warning)

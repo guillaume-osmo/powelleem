@@ -65,6 +65,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     DENewton:     RMSE 0.0557  wall 3.8s  κ = 0.372  ★ best overall
     DEHybrid:     RMSE 0.0941  wall 59s   κ = 0.44
     Speedup 15× over DEHybrid at 1.7× lower RMSE.
+- **`JaxMuonN`** solver — JAX port of Guillaume's PyTorch ``MuonN`` class
+  (AdaMuonn variant) from ``mlxmolkit/tools/torch_optimizers.py``.
+  Differs from the official AdaMuon by using:
+    * triple-β nested AdamN EMA (β_grad, β_nested, β_sq) with exact
+      closed-form bias correction for the nested moment;
+    * variance normalisation on the *raw gradient's* 2nd moment;
+    * Newton-Schulz quintic on the *direction* itself (not on
+      ``sign(direction)``);
+    * aspect-ratio rescale ``√max(1, rows/cols)``.
+  Available alongside `JaxAdaMuon` for direct A/B comparison.
+- ``examples/03_focused_bench.py`` — focused 6-solver harness keeping
+  only the methods that actually win on this dataset: DENewton,
+  DEHybrid, AnalyticNewton, AnalyticLM, JaxAdaMuon, JaxMuonN. Drops
+  the single-start derivative-free solvers (Newuoa, Bobyqa) and the
+  weaker autodiff variants (JaxLM, JaxAdam) that just match
+  AnalyticLM's basin without adding information.
 
 ## [0.1.0a0] — 2026-05-22
 

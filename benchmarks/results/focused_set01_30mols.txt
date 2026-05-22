@@ -1,0 +1,32 @@
+Loading NEEMP set01 (limit=30)…
+  30 mols, 1068 atoms, 12 types  (1.7s)
+
+=== DENewton ===
+  RMSE = 0.05574    wall = 12.80s    κ = 0.3722    nfev = 1190
+
+=== DEHybrid ===
+  RMSE = 0.09410    wall = 145.71s    κ = 0.4398    nfev = 330
+
+=== AnalyticNewton ===
+  RMSE = 0.36557    wall = 18.44s    κ = 0.5288    nfev = 319
+
+=== AnalyticLM ===
+  RMSE = 0.36861    wall = 11.13s    κ = 1.3913    nfev = 269
+
+=== JaxAdaMuon ===
+  RMSE = 2.91789    wall = 19.74s    κ = 2.1961    nfev = 500
+
+=== JaxMuonN ===
+  RMSE = 0.37607    wall = 18.28s    κ = 2.3247    nfev = 500
+
+======================================================================
+Solver                   RMSE    wall(s)          κ     nfev
+----------------------------------------------------------------------
+DENewton              0.05574      11.96     0.3722     1190
+DEHybrid              0.09410     145.42     0.4398      330
+AnalyticNewton        0.36557      18.43     0.5288      319
+AnalyticLM            0.36861      11.13     1.3913      269
+JaxMuonN              0.37607      12.65     2.3247      500
+JaxAdaMuon            2.91789      13.70     2.1961      500
+
+NEEMP CCD_gen reference: κ = 0.5125 (Raček et al. 2016).

@@ -19,6 +19,7 @@ from powelleem.solvers.de_newton import DENewton
 from powelleem.solvers.jax_adam import JaxAdam
 from powelleem.solvers.jax_adamuon import JaxAdaMuon
 from powelleem.solvers.jax_lm import JaxLM
+from powelleem.solvers.jax_muonn import JaxMuonN
 from powelleem.solvers.newuoa import Newuoa
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "JaxAdam",
     "JaxAdaMuon",
     "JaxLM",
+    "JaxMuonN",
     "Newuoa",
     "Bobyqa",
     "DEHybrid",
