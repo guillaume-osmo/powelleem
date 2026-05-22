@@ -5,3 +5,51 @@ Loading NEEMP set03 17 769 mol…
 Loading CHAOS iodine subset (500 mol)…
   500 mols, 9109 atoms, 13 types
 OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+
+=== NEEMP set03  loss=atom_rmse ===
+  κ = 0.4400   wall = 126.8 s
+  metric             train        test   gap
+  rmsd              0.0578      0.0577    -0.2 %
+  r                 0.9875      0.9878    +0.0 %
+  r2                0.9751      0.9758    +0.1 %
+  sp                0.9456      0.9461    +0.0 %
+  d_avg             0.0431      0.0431    -0.1 %
+  d_max             0.1731      0.1730    -0.1 %
+  atom_rmse         0.0581      0.0578    -0.4 %
+  → train/test RMSD gap: -0.2 %
+
+=== NEEMP set03  loss=mol_rmsd ===
+  κ = 0.1294   wall = 143.7 s
+  metric             train        test   gap
+  rmsd              0.0574      0.0573    -0.1 %
+  r                 0.9875      0.9879    +0.0 %
+  r2                0.9753      0.9759    +0.1 %
+  sp                0.9460      0.9465    +0.1 %
+  d_avg             0.0428      0.0428    -0.0 %
+  d_max             0.1713      0.1713    +0.0 %
+  atom_rmse         0.0578      0.0576    -0.4 %
+  → train/test RMSD gap: -0.1 %
+
+=== CHAOS iodine  loss=mol_rmsd ===
+  κ = 0.2640   wall = 1.4 s
+  metric             train        test   gap
+  rmsd              0.0800      0.0754    -5.7 %
+  r                 0.8603      0.8347    -3.0 %
+  r2                0.7401      0.6967    -5.9 %
+  sp                0.7294      0.6873    -5.8 %
+  d_avg             0.0584      0.0549    -6.0 %
+  d_max             0.2029      0.1905    -6.1 %
+  atom_rmse         0.0870      0.0771   -11.3 %
+  → train/test RMSD gap: -5.7 %
+
+=== CHAOS iodine  loss=atom_rmse ===
+  κ = 0.0100   wall = 1.2 s
+  metric             train        test   gap
+  rmsd              0.0827      0.0779    -5.7 %
+  r                 0.8588      0.8334    -3.0 %
+  r2                0.7376      0.6945    -5.8 %
+  sp                0.7346      0.6916    -5.9 %
+  d_avg             0.0606      0.0571    -5.9 %
+  d_max             0.2077      0.1956    -5.8 %
+  atom_rmse         0.0855      0.0782    -8.5 %
+  → train/test RMSD gap: -5.7 %

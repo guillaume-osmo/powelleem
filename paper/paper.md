@@ -198,6 +198,37 @@ quadratically-interpolated Hessian could not see.  Importantly, the
 improvement is consistent across every published statistic — including
 the worst-atom-error D_max which falls by nearly a quarter.
 
+## 3.3 Held-out generalisation
+
+To confirm the improvement is not an artefact of fitting the entire
+set03 (training the parameters on every molecule we score on), we
+repeat the headline fits with an 80/20 random train/test split
+(``Dataset.split()``):
+
+| Metric                  | Train (14,216 mol)  | Test (3,553 mol)    | Gap     |
+|---|---:|---:|---:|
+| RMSD                    | 0.0574              | 0.0573              | **−0.1 %** |
+| R                       | 0.9875              | 0.9879              | +0.04 %|
+| R²                      | 0.9753              | 0.9759              | +0.06 %|
+| Sp                      | 0.9460              | 0.9465              | +0.05 %|
+| D_avg                   | 0.0428              | 0.0428              | −0.0 % |
+| D_max                   | 0.1713              | 0.1713              | +0.0 % |
+| atom-flat RMSE          | 0.0578              | 0.0576              | −0.4 % |
+
+The test-set RMSD (0.0573) is within 0.1 % of the train-set RMSD and
+**still beats Raček 2016's published 0.0648 by 11.6 %**. The negative
+sign on most "gaps" simply reflects per-permutation noise — random
+selection of 3,553 of 17,769 molecules is not a guaranteed harder
+subset than the complementary 14,216. The substantive result is that
+the parameter set generalises essentially perfectly: with 31 free
+parameters fitted on ~660,000 atoms of training data, EEM here is
+nowhere near overfitting.
+
+This matches the well-known characteristic of EEM that it is a
+*structural* model — its parameters describe atom-type physics, not
+molecule-by-molecule details — so a representative training set of
+~14,000 molecules is more than enough to fix the 31 numbers.
+
 
 # 4. Atom typing: NEEMP element+bond-order vs MMFF94
 
