@@ -48,6 +48,9 @@ _MMFF94_SYMBOLS: tuple[str, ...] = (
 )
 
 
+_MMFF94_CACHE_DIR = Path.home() / ".cache" / "powelleem" / "neemp-mmff94"
+
+
 def load_neemp_with_mmff94(
     sdf_path: str | Path,
     chg_path: str | Path,
@@ -55,6 +58,8 @@ def load_neemp_with_mmff94(
     *,
     name: str = "NEEMP-MMFF94",
     limit: int | None = None,
+    cache_dir: str | Path | None = _MMFF94_CACHE_DIR,
+    use_cache: bool = True,
 ) -> Dataset:
     """Like :func:`powelleem.data.load_neemp`, but re-types atoms via MMFF94.
 
@@ -63,6 +68,27 @@ def load_neemp_with_mmff94(
     vocabulary becomes the subset of MMFF94 types actually present in the
     dataset (≤ 95).
     """
+    from powelleem.data import (
+        _build_inv_r,
+        _load_dataset_npz,
+        _neemp_cache_key,
+        _parse_neemp_chg,
+        _save_dataset_npz,
+    )
+    from powelleem.types import Dataset, MoleculeData
+
+    sdf_path = Path(sdf_path)
+    chg_path = Path(chg_path)
+    typ_path = Path(typ_path)
+
+    # ---- Try cache first (RDKit MMFF lookup takes ~9 min on 17k mol) ----
+    cache_path: Path | None = None
+    if use_cache and cache_dir is not None:
+        key = _neemp_cache_key(sdf_path, chg_path, typ_path, limit)
+        cache_path = Path(cache_dir) / f"{key}.npz"
+        if cache_path.exists():
+            return _load_dataset_npz(cache_path)
+
     try:
         from rdkit import Chem
         from rdkit.Chem import AllChem
@@ -71,12 +97,6 @@ def load_neemp_with_mmff94(
             "RDKit is required for MMFF94 typing. "
             "Install with `pip install powelleem[rdkit]`."
         ) from exc
-
-    from powelleem.data import _parse_neemp_chg, _build_inv_r
-    from powelleem.types import Dataset, MoleculeData
-
-    sdf_path = Path(sdf_path)
-    chg_path = Path(chg_path)
 
     charges_by_name = _parse_neemp_chg(chg_path)
 
@@ -133,7 +153,7 @@ def load_neemp_with_mmff94(
             )
         )
 
-    return Dataset(
+    ds = Dataset(
         molecules=molecules,
         atom_types=type_strs,
         name=name,
@@ -145,3 +165,9 @@ def load_neemp_with_mmff94(
             "n_skipped_mmff_failed": skipped,
         },
     )
+    if cache_path is not None:
+        try:
+            _save_dataset_npz(ds, cache_path)
+        except Exception:  # pragma: no cover
+            pass
+    return ds
