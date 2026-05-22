@@ -30,6 +30,7 @@ from powelleem.data import load_neemp
 from powelleem.solvers import (
     AnalyticLM,
     AnalyticNewton,
+    DEAdaMuonn,
     DEHybrid,
     DENewton,
     JaxAdaMuon,
@@ -60,16 +61,18 @@ def main(n_mols: int, seed: int = 42) -> None:
     config = SolverConfig(seed=seed)
 
     solvers = [
-        # Tier 1
+        # Tier 1: DE-warm + curvature-aware polish
         ("DENewton",       DENewton(config=config, population_size=50, n_generations=20,
                                     maxiter_lbfgs=100, maxiter_newton=100)),
+        ("DEAdaMuonn",     DEAdaMuonn(config=config, population_size=50, n_generations=20,
+                                       polish_iterations=500, polish_learning_rate=0.005)),
         ("DEHybrid",       DEHybrid(config=config, population_size=30, n_generations=10)),
-        # Tier 2
+        # Tier 2: single-start, Hessian-aware
         ("AnalyticNewton", AnalyticNewton(config=config, maxiter_lbfgs=100, maxiter_newton=100)),
         ("AnalyticLM",     AnalyticLM(config=config, maxiter_lbfgs=100, maxiter_lm=100)),
-        # Tier 3 — AdaMuon variants
-        ("JaxAdaMuon",     JaxAdaMuon(config=config, n_iterations=500, learning_rate=0.01)),
+        # Tier 3: orthogonalised gradient (no DE warm)
         ("JaxMuonN",       JaxMuonN(config=config, n_iterations=500, learning_rate=0.01)),
+        ("JaxAdaMuon",     JaxAdaMuon(config=config, n_iterations=500, learning_rate=0.01)),
     ]
 
     results = []

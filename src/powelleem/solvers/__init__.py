@@ -14,6 +14,7 @@ from powelleem.solvers.analytic_lm import AnalyticLM
 from powelleem.solvers.analytic_newton import AnalyticNewton
 from powelleem.solvers.base import SolverConfig, Solver
 from powelleem.solvers.bobyqa import Bobyqa
+from powelleem.solvers.de_adamuonn import DEAdaMuonn
 from powelleem.solvers.de_hybrid import DEHybrid
 from powelleem.solvers.de_newton import DENewton
 from powelleem.solvers.jax_adam import JaxAdam
@@ -35,4 +36,5 @@ __all__ = [
     "Bobyqa",
     "DEHybrid",
     "DENewton",
+    "DEAdaMuonn",
 ]

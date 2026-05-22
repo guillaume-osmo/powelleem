@@ -75,12 +75,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       ``sign(direction)``);
     * aspect-ratio rescale ``√max(1, rows/cols)``.
   Available alongside `JaxAdaMuon` for direct A/B comparison.
-- ``examples/03_focused_bench.py`` — focused 6-solver harness keeping
-  only the methods that actually win on this dataset: DENewton,
-  DEHybrid, AnalyticNewton, AnalyticLM, JaxAdaMuon, JaxMuonN. Drops
-  the single-start derivative-free solvers (Newuoa, Bobyqa) and the
-  weaker autodiff variants (JaxLM, JaxAdam) that just match
-  AnalyticLM's basin without adding information.
+- ``examples/03_focused_bench.py`` — focused harness now at 7 solvers
+  including the three DE-bridge variants (DENewton, DEHybrid,
+  DEAdaMuonn) and three single-start curvature methods (AnalyticNewton,
+  AnalyticLM, JaxMuonN, JaxAdaMuon).
+- **`DEAdaMuonn`** solver — sibling of `DENewton` that swaps the
+  AnalyticNewton polish for `JaxMuonN` (Guillaume's AdaMuonn variant).
+  DE finds the right basin, then AdaMuonn's spectrally-orthogonalised
+  steps refine inside it. Useful when the analytical Hessian is not
+  available (richer parametrisations, regularisers) or when you want
+  to compare curvature-aware vs spectral polish from the same DE warm
+  start. Benchmark on NEEMP set01 (30 mol):
+    DENewton    (DE + Hessian)  : RMSE 0.0557  wall  3.3s   κ=0.37  ★
+    DEHybrid    (DE + NEWUOA)   : RMSE 0.094   wall 53s     κ=0.44
+    DEAdaMuonn  (DE + AdaMuonn) : RMSE 0.114   wall  8.9s   κ=0.25  ★
+  DEAdaMuonn is 6× faster than DEHybrid at comparable RMSE — the
+  spectral polish reaches the global-basin neighbourhood despite no
+  curvature information.
 
 ## [0.1.0a0] — 2026-05-22
 
