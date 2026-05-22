@@ -1,3 +1,15 @@
 Loading set03 full…
 17769 mols, 821418 atoms, 15 types
 OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+
+=== loss_kind=atom_rmse ===
+  κ          = 0.4278  (NEEMP ref 0.5125)
+  loss       = 0.05814
+  wall       = 185.8s
+  Repro: RMSD=0.0579  atom_RMSE=0.0581  R=0.9871  R²=0.9744  Sp=0.9453  D_avg=0.0431  D_max=0.1743
+
+=== loss_kind=mol_rmsd ===
+  κ          = 0.2627  (NEEMP ref 0.5125)
+  loss       = 0.05781
+  wall       = 145.6s
+  Repro: RMSD=0.0574  atom_RMSE=0.0578  R=0.9876  R²=0.9754  Sp=0.9462  D_avg=0.0428  D_max=0.1714
