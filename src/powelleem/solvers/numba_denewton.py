@@ -60,6 +60,7 @@ class NumbaDENewton(Solver):
         maxiter_lbfgs: int = 100,
         maxiter_newton: int = 100,
         bound_penalty: float = 1e2,
+        loss_kind: str = "atom_rmse",
         use_serial_polish: bool = False,
     ) -> None:
         super().__init__(config)
@@ -70,6 +71,7 @@ class NumbaDENewton(Solver):
         self.maxiter_lbfgs = maxiter_lbfgs
         self.maxiter_newton = maxiter_newton
         self.bound_penalty = bound_penalty
+        self.loss_kind = loss_kind
         self.use_serial_polish = use_serial_polish
 
     def fit(
@@ -82,7 +84,7 @@ class NumbaDENewton(Solver):
         from powelleem.numba_backend import (
             build_numba_dataset,
             loss_grad_hessian_numba,
-            residuals_and_jacobian_numba,
+            loss_and_grad_numba_kind,
             residuals_only_numba,
         )
         from powelleem.types import FitResult, ParamSet
@@ -92,12 +94,26 @@ class NumbaDENewton(Solver):
         if x0 is None:
             x0 = random_initial_x(n_types, self.config)
 
-        # Build the Numba flat-arrays representation once (~ms cost)
         nd = build_numba_dataset(dataset)
         N_atoms = nd.total_atoms
 
-        def eval_rmse(x: NDArray[np.float64]) -> float:
+        def eval_fitness(x: NDArray[np.float64]) -> float:
+            """Compute the DE fitness value matching ``self.loss_kind``.
+
+            For atom-flat RMSE we just use the flat sqrt(mean(r²)).
+            For mol-RMSD we average per-molecule RMSDs.
+            """
             r = residuals_only_numba(x, nd)
+            if self.loss_kind == "mol_rmsd":
+                # Avg of per-mol RMSDs — matches NEEMP's DE_RMSD objective.
+                offset = 0
+                s_sum = 0.0
+                for m in range(nd.n_atoms.shape[0]):
+                    n_m = int(nd.n_atoms[m])
+                    rm = r[offset : offset + n_m]
+                    offset += n_m
+                    s_sum += float(np.sqrt((rm * rm).mean()))
+                return s_sum / nd.n_atoms.shape[0]
             return float(np.sqrt((r * r).mean()))
 
         # ----- Stage 1: DE global search (residuals-only Numba) -----
@@ -106,7 +122,7 @@ class NumbaDENewton(Solver):
         if x0 is not None:
             population[0] = np.clip(x0, lo, hi)
 
-        fitness = np.array([eval_rmse(p) for p in population])
+        fitness = np.array([eval_fitness(p) for p in population])
         best_idx = int(np.argmin(fitness))
         best_x = population[best_idx].copy()
         best_f = float(fitness[best_idx])
@@ -125,7 +141,7 @@ class NumbaDENewton(Solver):
                 v = np.clip(v, lo, hi)
                 mask = rng.random(v.shape) < self.crossover_CR
                 trial = np.where(mask, v, population[i])
-                trial_fit = eval_rmse(trial)
+                trial_fit = eval_fitness(trial)
                 n_de_evals += 1
                 if trial_fit < fitness[i]:
                     population[i] = trial
@@ -147,15 +163,12 @@ class NumbaDENewton(Solver):
             return p_val, p_grad, p_hess_diag
 
         def loss_grad(x: NDArray[np.float64]) -> tuple[float, NDArray[np.float64]]:
-            r, J = residuals_and_jacobian_numba(x, nd)
-            N = r.size
-            loss = float((r * r).sum() / N)
-            grad = (2.0 / N) * (J.T @ r)
+            loss, grad = loss_and_grad_numba_kind(x, nd, loss_kind=self.loss_kind)
             pv, pg, _ = penalty_components(x)
             return loss + self.bound_penalty * pv, grad + self.bound_penalty * pg
 
         def hess(x: NDArray[np.float64]) -> NDArray[np.float64]:
-            _, _, H = loss_grad_hessian_numba(x, nd)
+            _, _, H = loss_grad_hessian_numba(x, nd, loss_kind=self.loss_kind)
             _, _, pd = penalty_components(x)
             return H + self.bound_penalty * np.diag(pd)
 

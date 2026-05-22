@@ -543,14 +543,19 @@ def residuals_only_numba(
     return r
 
 
-def loss_grad_hessian_numba(
+def _run_hessian_kernel(
     x: NDArray[np.float64], nd: NumbaDataset
-) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
-    """Analytical loss + gradient + Hessian via JIT-parallel kernel.
+) -> tuple[
+    NDArray[np.float64],  # r_flat
+    NDArray[np.float64],  # JtJ_per_mol (B, P, P)
+    NDArray[np.float64],  # JtR_per_mol (B, P)
+    NDArray[np.float64],  # second_corr_per_mol (B, P, P)
+]:
+    """Run the Numba Hessian kernel and return raw per-mol accumulators.
 
-    Per-molecule cost: 1 LU + (1 + 2T) back-subs for Y_p (first derivatives)
-    + ``1 + 2T + T² + T(T+1)/2`` back-subs for the non-zero second-derivative
-    pair classes. All work parallelised across molecules via ``prange``.
+    Aggregation into (loss, grad, H) is left to the caller so different
+    loss formulations (atom-flat RMSE vs mol-RMSD vs log) can reuse the
+    same expensive linear-algebra work.
     """
     kappa = float(x[0])
     T = nd.n_types
@@ -570,17 +575,117 @@ def loss_grad_hessian_numba(
         nd.inv_r_flat, nd.inv_r_offsets,
         nd.atom_type_idx, nd.atom_offsets,
         nd.target_q, nd.q_total, nd.n_atoms,
-        r,
-        JtJ_per_mol, JtR_per_mol, second_corr_per_mol,
+        r, JtJ_per_mol, JtR_per_mol, second_corr_per_mol,
+    )
+    return r, JtJ_per_mol, JtR_per_mol, second_corr_per_mol
+
+
+def loss_grad_hessian_numba(
+    x: NDArray[np.float64],
+    nd: NumbaDataset,
+    *,
+    loss_kind: str = "atom_rmse",
+    eps: float = 1e-12,
+) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
+    """Analytical loss + gradient + Hessian via JIT-parallel kernel.
+
+    Parameters
+    ----------
+    loss_kind
+        ``"atom_rmse"`` (default) — minimise ``(1/N_atoms) Σ_i r_i²``.
+          Our previous fits used this; the global optimum on set03 lands
+          at κ ≈ 0.45 with RMSE ≈ 0.054.
+        ``"mol_rmsd"`` — minimise the NEEMP-style mean of per-molecule
+          RMSDs, ``f = (1/M) Σ_m sqrt((1/n_m) Σ_i r²)``. The original
+          Raček 2016 ``DE_RMSD`` mode; expected to land at κ ≈ 0.5125.
+
+    Derivation for ``mol_rmsd`` — let s_m = sqrt(MSE_m), where
+    MSE_m = (1/n_m) Σ_i r_i²:
+
+        ∂f/∂x   = (1/M) Σ_m (1/(n_m s_m)) (J_m^T r_m)
+        ∂²f/∂x∂x^T = (1/M) Σ_m [
+            (1/(n_m s_m)) (J_m^T J_m + Σ r ∇²r)_m
+          − (1/(n_m² s_m³)) (J_m^T r_m) ⊗ (J_m^T r_m)
+        ]
+
+    Per-molecule cost is identical for both loss kinds; only the final
+    Python-side aggregation changes.
+    """
+    r, JtJ_per_mol, JtR_per_mol, second_corr_per_mol = _run_hessian_kernel(x, nd)
+    return _aggregate_loss(
+        r, JtJ_per_mol, JtR_per_mol, second_corr_per_mol,
+        nd.atom_offsets, nd.n_atoms, loss_kind=loss_kind, eps=eps,
     )
 
-    # Reduce per-mol partials to globals
-    JtJ_tot = JtJ_per_mol.sum(axis=0)
-    JtR_tot = JtR_per_mol.sum(axis=0)
-    second_corr_tot = second_corr_per_mol.sum(axis=0)
 
-    N = r.size
-    loss = float((r * r).sum() / N)
-    grad = (2.0 / N) * JtR_tot
-    H = (2.0 / N) * (JtJ_tot + second_corr_tot)
-    return loss, grad, H
+def _aggregate_loss(
+    r: NDArray[np.float64],
+    JtJ_per_mol: NDArray[np.float64],
+    JtR_per_mol: NDArray[np.float64],
+    second_corr_per_mol: NDArray[np.float64],
+    atom_offsets: NDArray[np.int64],
+    n_atoms: NDArray[np.int64],
+    *,
+    loss_kind: str,
+    eps: float = 1e-12,
+) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
+    """Aggregate per-mol primitives into ``(loss, grad, Hessian)`` for a given loss."""
+    M = n_atoms.shape[0]
+    P = JtJ_per_mol.shape[1]
+
+    if loss_kind == "atom_rmse":
+        N = r.size
+        loss = float((r * r).sum() / N)
+        grad = (2.0 / N) * JtR_per_mol.sum(axis=0)
+        H = (2.0 / N) * (JtJ_per_mol + second_corr_per_mol).sum(axis=0)
+        return loss, grad, H
+
+    if loss_kind == "mol_rmsd":
+        H = np.zeros((P, P), dtype=np.float64)
+        grad = np.zeros(P, dtype=np.float64)
+        loss_sum = 0.0
+        for m in range(M):
+            n_m = int(n_atoms[m])
+            start = int(atom_offsets[m])
+            r_m = r[start : start + n_m]
+            mse_m = float((r_m * r_m).sum() / n_m)
+            s_m = float(np.sqrt(mse_m)) + eps
+            loss_sum += s_m
+            JtR_m = JtR_per_mol[m]
+            inv_ns = 1.0 / (n_m * s_m)
+            grad += inv_ns * JtR_m
+            H += inv_ns * (JtJ_per_mol[m] + second_corr_per_mol[m])
+            H -= (1.0 / (n_m * n_m * s_m * s_m * s_m)) * np.outer(JtR_m, JtR_m)
+        return loss_sum / M, grad / M, H / M
+
+    raise ValueError(f"unknown loss_kind: {loss_kind!r}")
+
+
+def loss_and_grad_numba_kind(
+    x: NDArray[np.float64], nd: NumbaDataset, *, loss_kind: str = "atom_rmse",
+    eps: float = 1e-12,
+) -> tuple[float, NDArray[np.float64]]:
+    """Cheap variant: only loss + gradient, skipping the Hessian work."""
+    r, J = residuals_and_jacobian_numba(x, nd)
+    M = nd.n_atoms.shape[0]
+
+    if loss_kind == "atom_rmse":
+        N = r.size
+        return float((r * r).sum() / N), (2.0 / N) * (J.T @ r)
+
+    if loss_kind == "mol_rmsd":
+        loss_sum = 0.0
+        grad = np.zeros(J.shape[1], dtype=np.float64)
+        offset = 0
+        for m in range(M):
+            n_m = int(nd.n_atoms[m])
+            r_m = r[offset : offset + n_m]
+            J_m = J[offset : offset + n_m]
+            offset += n_m
+            mse_m = float((r_m * r_m).sum() / n_m)
+            s_m = float(np.sqrt(mse_m)) + eps
+            loss_sum += s_m
+            grad += (1.0 / (n_m * s_m)) * (J_m.T @ r_m)
+        return loss_sum / M, grad / M
+
+    raise ValueError(f"unknown loss_kind: {loss_kind!r}")
