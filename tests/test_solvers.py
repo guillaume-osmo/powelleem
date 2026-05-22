@@ -53,7 +53,7 @@ def test_jax_lm_runs(micro_model, micro_dataset):
 
 @pytest.mark.powell
 def test_newuoa_runs(micro_model, micro_dataset):
-    pytest.importorskip("prima")
+    pytest.importorskip("pdfo")
     from powelleem.solvers import Newuoa
 
     solver = Newuoa(max_fev=500)
@@ -63,7 +63,7 @@ def test_newuoa_runs(micro_model, micro_dataset):
 
 @pytest.mark.powell
 def test_bobyqa_runs(micro_model, micro_dataset):
-    pytest.importorskip("prima")
+    pytest.importorskip("pdfo")
     from powelleem.solvers import Bobyqa
 
     solver = Bobyqa(max_fev=500)

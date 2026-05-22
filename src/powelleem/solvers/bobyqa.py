@@ -1,9 +1,9 @@
-"""Bobyqa solver — Powell's BOBYQA via PRIMA.
+"""Bobyqa solver — Powell's BOBYQA via PDFO.
 
 BOBYQA (Bound Optimization BY Quadratic Approximation, Powell 2009) is
 the bound-constrained sibling of NEWUOA. Same derivative-free
-trust-region machinery, but it handles ``[lo, hi]`` boxes natively so
-no penalty term is needed.
+trust-region machinery, but handles ``[lo, hi]`` boxes natively so no
+penalty term is needed.
 
 Reference
 ---------
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 class Bobyqa(Solver):
-    """Powell's BOBYQA via PRIMA (native bound constraints)."""
+    """Powell's BOBYQA via PDFO (native bound constraints)."""
 
     name = "Bobyqa"
 
@@ -37,13 +37,13 @@ class Bobyqa(Solver):
         config: SolverConfig | None = None,
         *,
         max_fev: int = 10000,
-        rhobeg: float | None = None,
-        rhoend: float = 1e-6,
+        radius_init: float | None = None,
+        radius_final: float = 1e-6,
     ) -> None:
         super().__init__(config)
         self.max_fev = max_fev
-        self.rhobeg = rhobeg
-        self.rhoend = rhoend
+        self.radius_init = radius_init
+        self.radius_final = radius_final
 
     def fit(
         self,
@@ -53,10 +53,10 @@ class Bobyqa(Solver):
         x0: NDArray[np.float64] | None = None,
     ) -> FitResult:
         try:
-            from prima import minimize as prima_minimize  # type: ignore
+            from pdfo import pdfo  # type: ignore
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
-                "PRIMA is required for the BOBYQA solver. "
+                "PDFO is required for the BOBYQA solver. "
                 "Install with `pip install powelleem[powell]`."
             ) from exc
 
@@ -80,15 +80,22 @@ class Bobyqa(Solver):
             return loss
 
         loss0 = objective(x0.copy())
-        rhobeg = self.rhobeg if self.rhobeg is not None else float(np.min(hi - lo) / 10)
+        radius_init = (
+            self.radius_init if self.radius_init is not None else float(np.min(hi - lo) / 10)
+        )
+        options = {
+            "maxfev": self.max_fev,
+            "radius_init": radius_init,
+            "radius_final": self.radius_final,
+        }
 
+        # PDFO accepts bounds as a list of (lo, hi) scalar tuples.
+        bounds_pairs = list(zip(lo.tolist(), hi.tolist(), strict=True))
         t0 = time.perf_counter()
-        res = prima_minimize(
-            objective,
-            x0,
-            method="bobyqa",
-            bounds=list(zip(lo, hi, strict=True)),
-            options={"maxfev": self.max_fev, "rhobeg": rhobeg, "rhoend": self.rhoend},
+        res = pdfo(
+            objective, x0, method="bobyqa",
+            bounds=bounds_pairs,
+            options=options,
         )
         wall = time.perf_counter() - t0
 
@@ -105,11 +112,11 @@ class Bobyqa(Solver):
             solver_name=self.name,
             solver_metadata={
                 "max_fev": self.max_fev,
-                "rhobeg": rhobeg,
-                "rhoend": self.rhoend,
-                "prima_status": getattr(res, "status", None),
-                "prima_message": getattr(res, "message", None),
-                "n_fev_prima": getattr(res, "nfev", None),
+                "radius_init": radius_init,
+                "radius_final": self.radius_final,
+                "pdfo_status": int(getattr(res, "status", -1)),
+                "pdfo_message": str(getattr(res, "message", "")),
+                "n_fev_pdfo": int(getattr(res, "nfev", 0)),
             },
             wall_time_s=wall,
             n_function_evals=loss_evals["count"],

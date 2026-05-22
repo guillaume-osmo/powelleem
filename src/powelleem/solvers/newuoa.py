@@ -1,9 +1,9 @@
-"""Newuoa solver — Powell's NEWUOA via PRIMA.
+"""Newuoa solver — Powell's NEWUOA via PDFO.
 
 NEWUOA (NEW Unconstrained Optimization Algorithm, Powell 2006) is the
-derivative-free trust-region solver used by your original MATLAB
-``DE_UOA_FINAL.m`` pipeline. PRIMA (libprima) is the modern Fortran
-reference re-implementation by Zaikun Zhang with Python bindings.
+derivative-free trust-region solver used by the original MATLAB
+``DE_UOA_FINAL.m`` pipeline. PDFO (Ragonneau & Zhang 2024) is the
+modern Fortran reference re-implementation with Python bindings.
 
 NEWUOA is *unconstrained*; bound constraints are emulated by adding a
 quadratic penalty when the parameters drift outside ``[lo, hi]``.
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 
 class Newuoa(Solver):
-    """Powell's NEWUOA via PRIMA, with quadratic bound penalty."""
+    """Powell's NEWUOA via PDFO, with quadratic bound penalty."""
 
     name = "Newuoa"
 
@@ -44,14 +44,14 @@ class Newuoa(Solver):
         *,
         max_fev: int = 10000,
         bound_penalty: float = 1e3,
-        rhobeg: float | None = None,
-        rhoend: float = 1e-6,
+        radius_init: float | None = None,
+        radius_final: float = 1e-6,
     ) -> None:
         super().__init__(config)
         self.max_fev = max_fev
         self.bound_penalty = bound_penalty
-        self.rhobeg = rhobeg
-        self.rhoend = rhoend
+        self.radius_init = radius_init
+        self.radius_final = radius_final
 
     def fit(
         self,
@@ -61,10 +61,10 @@ class Newuoa(Solver):
         x0: NDArray[np.float64] | None = None,
     ) -> FitResult:
         try:
-            from prima import minimize as prima_minimize  # type: ignore
+            from pdfo import pdfo  # type: ignore
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
-                "PRIMA is required for the NEWUOA solver. "
+                "PDFO is required for the NEWUOA solver. "
                 "Install with `pip install powelleem[powell]`."
             ) from exc
 
@@ -82,7 +82,7 @@ class Newuoa(Solver):
         def objective(x: NDArray[np.float64]) -> float:
             r, _ = residuals_and_jacobian(x, dataset, n_types)
             loss = float((r * r).mean())
-            # Quadratic penalty for bound violation (NEWUOA is unconstrained)
+            # Quadratic penalty for bound violation (NEWUOA is unconstrained).
             penalty = float(
                 (np.maximum(0.0, lo - x) ** 2).sum()
                 + (np.maximum(0.0, x - hi) ** 2).sum()
@@ -94,18 +94,20 @@ class Newuoa(Solver):
 
         loss0 = objective(x0.copy())
 
-        rhobeg = self.rhobeg if self.rhobeg is not None else float(np.min(hi - lo) / 10)
-        t0 = time.perf_counter()
-        res = prima_minimize(
-            objective,
-            x0,
-            method="newuoa",
-            options={"maxfev": self.max_fev, "rhobeg": rhobeg, "rhoend": self.rhoend},
+        radius_init = (
+            self.radius_init if self.radius_init is not None else float(np.min(hi - lo) / 10)
         )
+        options = {
+            "maxfev": self.max_fev,
+            "radius_init": radius_init,
+            "radius_final": self.radius_final,
+        }
+
+        t0 = time.perf_counter()
+        res = pdfo(objective, x0, method="newuoa", options=options)
         wall = time.perf_counter() - t0
 
-        x_opt = np.clip(res.x, lo, hi)  # final clip in case it drifted
-        # Evaluate the *true* loss (without penalty) at the final point.
+        x_opt = np.clip(res.x, lo, hi)
         r_final, _ = residuals_and_jacobian(x_opt, dataset, n_types)
         loss_final = float((r_final * r_final).mean())
         rmse = float(np.sqrt(loss_final))
@@ -119,12 +121,12 @@ class Newuoa(Solver):
             solver_name=self.name,
             solver_metadata={
                 "max_fev": self.max_fev,
-                "rhobeg": rhobeg,
-                "rhoend": self.rhoend,
+                "radius_init": radius_init,
+                "radius_final": self.radius_final,
                 "bound_penalty": self.bound_penalty,
-                "prima_status": getattr(res, "status", None),
-                "prima_message": getattr(res, "message", None),
-                "n_fev_prima": getattr(res, "nfev", None),
+                "pdfo_status": int(getattr(res, "status", -1)),
+                "pdfo_message": str(getattr(res, "message", "")),
+                "n_fev_pdfo": int(getattr(res, "nfev", 0)),
             },
             wall_time_s=wall,
             n_function_evals=loss_evals["count"],

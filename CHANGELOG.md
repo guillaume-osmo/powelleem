@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Switched `Newuoa`/`Bobyqa`/`DEHybrid` from non-existent `prima.minimize`
+  to the actual PDFO API (`from pdfo import pdfo`) with the correct
+  options layout (`radius_init`/`radius_final` not `rhobeg`/`rhoend`,
+  bounds as list of scalar 2-tuples).
+- `pyproject.toml` `[powell]` extra now installs `pdfo>=2.0` (not `prima`).
+- Test markers updated: `pytest.importorskip("pdfo")` for Powell solver tests.
+
+### Added
+- `load_neemp(sdf, chg, typ)` reads the original NEEMP-format triplet
+  (Raček 2016) with element-bond-order atom typing.
+- `examples/02_validate_against_matlab.py` — first validation against the
+  original MATLAB workflow data (NEEMP set01).
+- `benchmarks/results/neemp_set01_30mols_first_validation.txt` — first
+  benchmark log: all 5 non-DE solvers converge on real B3LYP/6-311G NPA
+  reference charges. AnalyticLM is 5× faster than NEWUOA at comparable RMSE.
+
 ## [0.1.0a0] — 2026-05-22
 
 ### Added

@@ -67,13 +67,14 @@ class DEHybrid(Solver):
         from powelleem.jacobian import residuals_and_jacobian
         from powelleem.types import FitResult, ParamSet
 
-        # PRIMA is optional — DE itself works without it, but the polish does need it.
+        # PDFO is optional — DE itself works without it, but the polish does need it.
         try:
-            from prima import minimize as prima_minimize  # type: ignore
+            from pdfo import pdfo  # type: ignore
 
-            have_prima = True
+            have_pdfo = True
         except ImportError:
-            have_prima = False
+            have_pdfo = False
+            pdfo = None  # type: ignore
 
         n_types = model.n_types
         lo, hi = self.config.bounds_array(n_types)
@@ -141,18 +142,18 @@ class DEHybrid(Solver):
                         best_f = rmse_trial
                         best_x = trial.copy()
                         # Polish promising candidates with NEWUOA
-                        if have_prima and r_trial > self.polish_r2_threshold:
+                        if have_pdfo and r_trial > self.polish_r2_threshold:
                             best_x, best_f = self._polish(
                                 best_x, best_f, dataset, n_types, lo, hi,
-                                prima_minimize, self.polish_max_fev,
+                                pdfo, self.polish_max_fev,
                             )
             trajectory.append(best_f)
 
         # ----- Stage 2: final NEWUOA polish on best individual ----------
-        if have_prima:
+        if have_pdfo:
             best_x, best_f = self._polish(
                 best_x, best_f, dataset, n_types, lo, hi,
-                prima_minimize, self.final_polish_max_fev,
+                pdfo, self.final_polish_max_fev,
             )
 
         wall = time.perf_counter() - t_start
@@ -172,7 +173,7 @@ class DEHybrid(Solver):
                 "mutation_F": self.mutation_F,
                 "crossover_CR": self.crossover_CR,
                 "polish_r2_threshold": self.polish_r2_threshold,
-                "have_prima": have_prima,
+                "have_pdfo": have_pdfo,
             },
             wall_time_s=wall,
             n_function_evals=loss_evals["count"],
@@ -190,7 +191,7 @@ class DEHybrid(Solver):
         n_types: int,
         lo: NDArray[np.float64],
         hi: NDArray[np.float64],
-        prima_minimize,  # type: ignore[no-untyped-def]
+        pdfo_fn,  # type: ignore[no-untyped-def]
         max_fev: int,
     ) -> tuple[NDArray[np.float64], float]:
         from powelleem.jacobian import residuals_and_jacobian
@@ -206,10 +207,10 @@ class DEHybrid(Solver):
             )
             return loss + bound_penalty * pen
 
-        rhobeg = float(np.min(hi - lo) / 20)
-        res = prima_minimize(
+        radius_init = float(np.min(hi - lo) / 20)
+        res = pdfo_fn(
             obj, x, method="newuoa",
-            options={"maxfev": max_fev, "rhobeg": rhobeg, "rhoend": 1e-6},
+            options={"maxfev": max_fev, "radius_init": radius_init, "radius_final": 1e-6},
         )
         x_new = np.clip(res.x, lo, hi)
         r_new, _ = residuals_and_jacobian(x_new, dataset, n_types)

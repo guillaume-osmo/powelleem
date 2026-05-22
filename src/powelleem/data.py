@@ -174,34 +174,163 @@ def _z_to_symbol(z: int) -> str:
 # NEEMP legacy loader (Račkov 2016) — .chg / .typ / .sdf triplet
 # ---------------------------------------------------------------------------
 
-def load_neemp_legacy(
+def _parse_neemp_chg(path: Path) -> dict[str, NDArray[np.float64]]:
+    """Parse a NEEMP ``.chg`` file.
+
+    Format (one block per molecule)::
+
+        NSC_100000           ← mol name
+        29                    ← number of atoms
+             1  N   -0.812377
+             2  O   -0.510019
+             ...
+    """
+    out: dict[str, NDArray[np.float64]] = {}
+    with path.open() as fh:
+        lines = fh.read().splitlines()
+    i = 0
+    while i < len(lines):
+        if not lines[i].strip():
+            i += 1
+            continue
+        name = lines[i].strip()
+        i += 1
+        n = int(lines[i].strip())
+        i += 1
+        charges = np.empty(n, dtype=np.float64)
+        for j in range(n):
+            parts = lines[i].split()
+            charges[j] = float(parts[2])
+            i += 1
+        out[name] = charges
+    return out
+
+
+def _parse_neemp_typ(path: Path) -> dict[str, list[tuple[str, str]]]:
+    """Parse a NEEMP ``.typ`` file.
+
+    Format per mol block::
+
+        NSC_100000
+           1   N   1
+           2   O   2
+           ...
+
+    The third column is the bond-order class (1 for single, 2 for double,
+    1.5 for aromatic, 3 for triple).
+    """
+    out: dict[str, list[tuple[str, str]]] = {}
+    with path.open() as fh:
+        lines = fh.read().splitlines()
+    i = 0
+    while i < len(lines):
+        if not lines[i].strip():
+            i += 1
+            continue
+        name = lines[i].strip()
+        i += 1
+        atoms: list[tuple[str, str]] = []
+        while i < len(lines) and lines[i].strip() and not lines[i].lstrip()[0].isalpha():
+            parts = lines[i].split()
+            # parts[0] = atom_idx (1-based), parts[1] = element, parts[2] = bond-order class
+            atoms.append((parts[1], parts[2]))
+            i += 1
+        out[name] = atoms
+    return out
+
+
+def load_neemp(
     sdf_path: str | Path,
     chg_path: str | Path,
     typ_path: str | Path,
     *,
-    name: str = "NEEMP-legacy",
+    name: str = "NEEMP",
+    limit: int | None = None,
 ) -> Dataset:
     """Load a NEEMP-format dataset: SDF + ``.chg`` + ``.typ`` triplet.
 
-    The NEEMP files use a custom whitespace format where ``.chg`` contains
-    one line per atom with ``(mol_id, atom_idx, charge)`` and ``.typ``
-    contains ``(mol_id, atom_idx, element, neemp_type)``.
+    Atom typing follows NEEMP's *ElemBond* convention — atoms are typed by
+    ``(element, bond_order_class)`` (e.g. ``"C-1"``, ``"C-1.5"``, ``"O-2"``).
+    The bond-order class comes straight from the ``.typ`` file.
 
     Requires RDKit for SDF parsing.
     """
     try:
-        from rdkit import Chem  # noqa: F401
+        from rdkit import Chem
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "RDKit is required for the NEEMP legacy loader. "
+            "RDKit is required for the NEEMP loader. "
             "Install with `pip install powelleem[rdkit]`."
         ) from exc
 
-    # Stub — full implementation reads the three files and aligns by mol_id.
-    raise NotImplementedError(
-        "NEEMP legacy loader is scaffolded but not yet implemented in v0.1.0a0. "
-        "Contributions welcome — see `data.load_chaos` for the reference pattern."
+    sdf_path = Path(sdf_path)
+    chg_path = Path(chg_path)
+    typ_path = Path(typ_path)
+
+    charges_by_name = _parse_neemp_chg(chg_path)
+    types_by_name = _parse_neemp_typ(typ_path)
+
+    suppl = Chem.SDMolSupplier(str(sdf_path), removeHs=False, sanitize=True)
+    raw: list[tuple[str, NDArray[np.float64], list[tuple[str, str]], NDArray[np.float64]]] = []
+    seen_types: set[tuple[str, str]] = set()
+    for mol in suppl:
+        if mol is None:
+            continue
+        name_id = mol.GetProp("_Name") if mol.HasProp("_Name") else None
+        if not name_id:
+            continue
+        if name_id not in charges_by_name or name_id not in types_by_name:
+            continue
+        conf = mol.GetConformer(0)
+        coords = np.asarray(
+            [list(conf.GetAtomPosition(i)) for i in range(mol.GetNumAtoms())], dtype=np.float64
+        )
+        if coords.shape[0] != mol.GetNumAtoms():
+            continue
+        atom_types_meta = types_by_name[name_id]
+        if len(atom_types_meta) != coords.shape[0]:
+            continue
+        q_ref = charges_by_name[name_id]
+        if q_ref.shape[0] != coords.shape[0]:
+            continue
+        seen_types.update(atom_types_meta)
+        raw.append((name_id, coords, atom_types_meta, q_ref))
+        if limit is not None and len(raw) >= limit:
+            break
+
+    type_strs = tuple(sorted({f"{e}-{b}" for e, b in seen_types}))
+    type_idx = {t: i + 1 for i, t in enumerate(type_strs)}
+
+    molecules: list[MoleculeData] = []
+    for name_id, coords, atype_meta, q_ref in raw:
+        molecules.append(
+            MoleculeData(
+                smiles="",  # SDF doesn't carry SMILES — could re-compute with Chem.MolToSmiles
+                atom_types=np.asarray(
+                    [type_idx[f"{e}-{b}"] for e, b in atype_meta], dtype=np.int64
+                ),
+                inv_r=_build_inv_r(coords),
+                target_charges=q_ref,
+                metadata={"source": "NEEMP", "name": name_id},
+            )
+        )
+
+    return Dataset(
+        molecules=molecules,
+        atom_types=type_strs,
+        name=name,
+        metadata={
+            "source": "NEEMP",
+            "sdf": str(sdf_path),
+            "chg": str(chg_path),
+            "typ": str(typ_path),
+            "n_loaded": len(molecules),
+        },
     )
+
+
+# Back-compat alias
+load_neemp_legacy = load_neemp
 
 
 # ---------------------------------------------------------------------------
