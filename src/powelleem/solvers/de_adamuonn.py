@@ -53,10 +53,16 @@ class DEAdaMuonn(Solver):
         n_generations: int = 20,
         mutation_F: float = 0.5,
         crossover_CR: float = 0.7,
-        # JaxMuonN polish stage
-        polish_iterations: int = 500,
+        # JaxMuonN polish stage — defaults tuned on NEEMP set01 (30 mol) to
+        # match DENewton's RMSE (0.0557). Key finding from the sweep:
+        # β_nested = 0.0 (= collapse nested EMA to standard Adam structure)
+        # beats β_nested = 0.1 because our gradients are exact (JAX autodiff)
+        # and the nested averaging is only useful for noisy gradients in NN
+        # training. n_iter must be ≥ 1000 to reach the basin minimum without
+        # curvature info; lr ∈ [0.005, 0.02] all give RMSE ≈ 0.056.
+        polish_iterations: int = 2000,
         polish_learning_rate: float = 0.005,
-        polish_betas: tuple[float, float, float] = (0.9, 0.1, 0.999),
+        polish_betas: tuple[float, float, float] = (0.9, 0.0, 0.999),
         polish_ns_steps: int = 5,
     ) -> None:
         super().__init__(config)

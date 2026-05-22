@@ -64,8 +64,8 @@ def main(n_mols: int, seed: int = 42) -> None:
         # Tier 1: DE-warm + curvature-aware polish
         ("DENewton",       DENewton(config=config, population_size=50, n_generations=20,
                                     maxiter_lbfgs=100, maxiter_newton=100)),
-        ("DEAdaMuonn",     DEAdaMuonn(config=config, population_size=50, n_generations=20,
-                                       polish_iterations=500, polish_learning_rate=0.005)),
+        ("DEAdaMuonn",     DEAdaMuonn(config=config, population_size=50, n_generations=20)),
+        # ↑ DEAdaMuonn now uses tuned defaults (n_iter=2000, betas=(0.9, 0.0, 0.999))
         ("DEHybrid",       DEHybrid(config=config, population_size=30, n_generations=10)),
         # Tier 2: single-start, Hessian-aware
         ("AnalyticNewton", AnalyticNewton(config=config, maxiter_lbfgs=100, maxiter_newton=100)),

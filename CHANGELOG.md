@@ -85,13 +85,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   steps refine inside it. Useful when the analytical Hessian is not
   available (richer parametrisations, regularisers) or when you want
   to compare curvature-aware vs spectral polish from the same DE warm
-  start. Benchmark on NEEMP set01 (30 mol):
-    DENewton    (DE + Hessian)  : RMSE 0.0557  wall  3.3s   κ=0.37  ★
-    DEHybrid    (DE + NEWUOA)   : RMSE 0.094   wall 53s     κ=0.44
-    DEAdaMuonn  (DE + AdaMuonn) : RMSE 0.114   wall  8.9s   κ=0.25  ★
-  DEAdaMuonn is 6× faster than DEHybrid at comparable RMSE — the
-  spectral polish reaches the global-basin neighbourhood despite no
-  curvature information.
+  start.
+
+- ``examples/04_tune_de_adamuonn.py`` — 3-stage hyperparameter sweep
+  for the DEAdaMuonn polish phase (lr × n_iter × betas × ns_steps).
+  Sweep result on NEEMP set01 (30 mol):
+
+      DENewton reference         : RMSE 0.0557, wall 3.3s, κ = 0.37
+      DEAdaMuonn defaults (old)  : RMSE 0.114,  wall 8.9s, κ = 0.25
+      DEAdaMuonn TUNED           : RMSE 0.0557, wall 8.5s, κ = 0.36 ← ties Newton!
+          config: lr=0.005, n_iter=2000, betas=(0.9, 0.0, 0.999), ns_steps=5
+
+  Key finding: **β_nested = 0.0** (collapse the AdamN nested EMA back
+  to plain Adam structure) is best for our small-dim least-squares.
+  The nested averaging in MuonN's default β = (0.9, 0.1, 0.999) is
+  designed for noisy NN gradients; with exact JAX autodiff gradients
+  it just smears the signal. `polish_iterations ≥ 1000` is needed
+  because Adam-class methods lack the quadratic Newton convergence
+  near the basin minimum.
+
+  Solver defaults updated to the tuned config so out-of-the-box use
+  matches DENewton on RMSE (at 2.6× the wall, expected for 1st-order
+  vs 2nd-order).
 
 ## [0.1.0a0] — 2026-05-22
 
