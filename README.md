@@ -11,8 +11,10 @@ over six solvers including Powell's NEWUOA/BOBYQA.**
 The Electronegativity Equalization Method (EEM, Mortier 1986) predicts atomic
 partial charges from per-element parameters (electronegativity α, hardness β,
 screening κ). Fitting those parameters to ab-initio reference charges is a
-non-linear least-squares problem that historically used derivative-free solvers
-(Powell's NEWUOA / BOBYQA). This package adds:
+non-linear least-squares problem traditionally tackled with derivative-free
+solvers (Powell's NEWUOA / BOBYQA), as exemplified by **NEEMP** (Raček
+et al. 2016) — the open-source reference implementation that inspires the
+overall fitting protocol used here. This package adds:
 
 1. **Analytical Jacobian** via the implicit function theorem — exact gradients
    at 1 LU factorization + (1 + 2T) back-substitutions per molecule.
@@ -94,21 +96,31 @@ See [docs/theory.md](docs/theory.md) for the full derivation.
 ## Origin & references
 
 This package is a complete rewrite of the original MATLAB code
-(`de-uoa-matlab`, Godin 2017–2023). The mathematical model follows
-NEEMP (Račkov & Svobodová 2016) and goes back to Mortier (1986).
+(`de-uoa-matlab`, Godin 2017–2023). The mathematical model is the
+Electronegativity Equalization Method introduced by Mortier (1986). The
+parameter-fitting protocol — atom typing, default-parameter fallback
+hierarchy, hybrid global/local optimisation, validation suite — is
+directly inspired by **NEEMP** (Raček et al., CEITEC, 2016), which is
+the reference open-source implementation of EEM parameterisation. If
+you use `powelleem`, please also cite NEEMP.
 
 **Key references**
 
 - Mortier, W. J.; Ghosh, S. K.; Shankar, S. *Electronegativity-equalization
-  method for the calculation of atomic charges in molecules.* J. Am. Chem.
-  Soc. **1986**, 108, 4315–4320.
-- Račkov, T. *NEEMP: software for parametrization of EEM.* J. Cheminform. **2016**, 8, 57.
+  method for the calculation of atomic charges in molecules.* **J. Am. Chem.
+  Soc.** 1986, 108, 4315–4320.
+- **Raček, T.; Pazúriková, J.; Svobodová Vařeková, R.; Geidl, S.;
+  Křenek, A.; Falginella, F. L.; Horský, V.; Hejret, V.; Koča, J.**
+  *NEEMP: software for validation, accurate calculation and fast
+  parameterization of EEM charges.* **J. Cheminform.** 2016, 8, 57.
+  DOI: [10.1186/s13321-016-0171-1](https://doi.org/10.1186/s13321-016-0171-1)
+  • PMC: [PMC5067907](https://pmc.ncbi.nlm.nih.gov/articles/PMC5067907/)
 - Powell, M. J. D. *The NEWUOA software for unconstrained optimization
-  without derivatives.* in *Large-Scale Nonlinear Optimization*, Springer 2006.
+  without derivatives.* In *Large-Scale Nonlinear Optimization*, Springer 2006.
 - Powell, M. J. D. *The BOBYQA algorithm for bound constrained optimization
   without derivatives.* Cambridge NA Report NA2009/06, 2009.
 - Ragonneau, T. M.; Zhang, Z. *PDFO: a cross-platform package for Powell's
-  derivative-free optimization solvers.* Math. Prog. Comput. **2024**.
+  derivative-free optimization solvers.* **Math. Prog. Comput.** 2024.
 
 ## Citation
 

@@ -1,7 +1,8 @@
 cff-version: 1.2.0
 message: >-
-  If you use this software, please cite both the software and the underlying
-  papers (NEEMP, MMFF94, NEWUOA/BOBYQA references).
+  If you use this software, please cite **both** powelleem and the NEEMP
+  paper (see `references` below) — powelleem's parameter-fitting protocol
+  is directly inspired by NEEMP.
 type: software
 title: 'powelleem: EEM parameter fitting with analytical Jacobian and Powell solvers'
 version: 0.1.0a0
@@ -17,10 +18,14 @@ abstract: >-
   parameter fitting pipeline, with an analytical Jacobian (via the implicit
   function theorem), six interchangeable solvers (NumPy + LM, NEWUOA, BOBYQA,
   JAX + Adam, JAX + LM, and a DE/NEWUOA hybrid that reproduces the original
-  MATLAB DE_UOA_FINAL pipeline), and a statistical benchmark harness.
+  MATLAB DE_UOA_FINAL pipeline), and a statistical benchmark harness. The
+  parameter-fitting protocol — atom typing, default-parameter fallback
+  hierarchy, hybrid global/local optimisation, validation suite — is directly
+  inspired by NEEMP (Raček et al., J. Cheminform. 2016, 8, 57).
 keywords:
   - EEM
   - electronegativity equalization
+  - NEEMP
   - partial charges
   - NEWUOA
   - BOBYQA
@@ -28,10 +33,65 @@ keywords:
   - molecular descriptors
   - RDKit
   - MMFF94
+references:
+  - type: article
+    title: >-
+      NEEMP: software for validation, accurate calculation and fast
+      parameterization of EEM charges
+    authors:
+      - family-names: Raček
+        given-names: Tomáš
+      - family-names: Pazúriková
+        given-names: Jana
+      - family-names: Svobodová Vařeková
+        given-names: Radka
+      - family-names: Geidl
+        given-names: Stanislav
+      - family-names: Křenek
+        given-names: Aleš
+      - family-names: Falginella
+        given-names: Francesco Luca
+      - family-names: Horský
+        given-names: Vladimír
+      - family-names: Hejret
+        given-names: Václav
+      - family-names: Koča
+        given-names: Jaroslav
+    journal: Journal of Cheminformatics
+    year: 2016
+    volume: 8
+    number: 1
+    pages: '57'
+    doi: 10.1186/s13321-016-0171-1
+    url: 'https://jcheminf.biomedcentral.com/articles/10.1186/s13321-016-0171-1'
+    notes: >-
+      Reference open-source EEM parameterisation protocol. The atom-typing
+      scheme, default-parameter fallback hierarchy, and DE+NEWUOA hybrid
+      optimisation strategy in powelleem are directly inspired by NEEMP.
+  - type: article
+    title: >-
+      Electronegativity-equalization method for the calculation of atomic
+      charges in molecules
+    authors:
+      - family-names: Mortier
+        given-names: Wilfried J.
+      - family-names: Ghosh
+        given-names: Swapan K.
+      - family-names: Shankar
+        given-names: S.
+    journal: Journal of the American Chemical Society
+    year: 1986
+    volume: 108
+    issue: 15
+    start: 4315
+    end: 4320
+    doi: 10.1021/ja00275a013
+    notes: Original EEM formulation.
 preferred-citation:
-  type: article
+  type: software
   title: 'powelleem: a modern Python EEM parameter fitter (in preparation)'
   authors:
     - family-names: Godin
       given-names: Guillaume
   year: 2026
+  version: 0.1.0a0

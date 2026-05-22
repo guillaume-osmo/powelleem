@@ -88,8 +88,24 @@ population. The MATLAB pipeline is faithfully reproduced as the
 
 ## References
 
-1. Mortier, W. J.; Ghosh, S. K.; Shankar, S. *J. Am. Chem. Soc.* **108**, 4315 (1986).
-2. Račkov, T. *J. Cheminform.* **8**, 57 (2016) — NEEMP.
-3. Powell, M. J. D. *NEWUOA* (2006); *BOBYQA* (2009).
-4. Ragonneau, T. M.; Zhang, Z. *Math. Prog. Comput.* (2024) — PDFO.
-5. Halgren, T. A. *J. Comput. Chem.* **17**, 490–641 (1996) — MMFF94 (BCI scheme is the MMFF charge analogue).
+1. Mortier, W. J.; Ghosh, S. K.; Shankar, S. *Electronegativity-equalization
+   method for the calculation of atomic charges in molecules.*
+   *J. Am. Chem. Soc.* **108**, 4315–4320 (1986). — original EEM formulation.
+2. **Raček, T.; Pazúriková, J.; Svobodová Vařeková, R.; Geidl, S.; Křenek, A.;
+   Falginella, F. L.; Horský, V.; Hejret, V.; Koča, J.**
+   *NEEMP: software for validation, accurate calculation and fast
+   parameterization of EEM charges.* *J. Cheminform.* **8**, 57 (2016). —
+   reference open-source EEM parameterisation protocol; the present
+   package's atom-typing, default-parameter hierarchy, and DE+NEWUOA hybrid
+   strategy are directly inspired by NEEMP. **Always cite together with
+   `powelleem`.** DOI: [10.1186/s13321-016-0171-1](https://doi.org/10.1186/s13321-016-0171-1).
+3. Powell, M. J. D. *The NEWUOA software for unconstrained optimization
+   without derivatives.* In *Large-Scale Nonlinear Optimization*,
+   pp. 255–297, Springer (2006).
+4. Powell, M. J. D. *The BOBYQA algorithm for bound constrained
+   optimization without derivatives.* Cambridge NA Report NA2009/06 (2009).
+5. Ragonneau, T. M.; Zhang, Z. *PDFO: a cross-platform package for Powell's
+   derivative-free optimization solvers.* *Math. Prog. Comput.* (2024).
+6. Halgren, T. A. *Merck molecular force field.* *J. Comput. Chem.* **17**,
+   490–641 (1996) — MMFF94 (BCI scheme is the molecular-mechanics analogue
+   of the EEM bond-charge model).

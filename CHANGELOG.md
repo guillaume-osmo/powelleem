@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0a0] — 2026-05-22
 
 ### Added
-- Initial scaffold from the MATLAB `de-uoa-matlab` pipeline (Godin 2017–2023).
+- Initial scaffold from the MATLAB `de-uoa-matlab` pipeline (Godin 2017–2023),
+  with parameter-fitting protocol inspired by **NEEMP** (Raček et al.,
+  *J. Cheminform.* 2016, 8, 57, DOI: 10.1186/s13321-016-0171-1) — atom
+  typing, default-parameter fallback hierarchy, DE+NEWUOA hybrid strategy.
 - `powelleem.model` — NumPy + JAX EEM forward pass.
 - `powelleem.jacobian` — analytical Jacobian via the implicit function theorem.
 - `powelleem.data` — CHAOS, NEEMP-legacy (`.chg`/`.typ`/`.sdf`) and generic loaders.
