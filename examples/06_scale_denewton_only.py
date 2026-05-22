@@ -24,11 +24,18 @@ import argparse
 import time
 from pathlib import Path
 
+import os
+
 from powelleem import EEMModel
 from powelleem.data import load_neemp
 from powelleem.solvers import DENewton, SolverConfig
 
-NEEMP_EXAMPLES = Path("/Volumes/RescueCopy/Downloads/de-uoa-matlab/neemp/examples")
+NEEMP_EXAMPLES = Path(
+    os.environ.get(
+        "POWELLEEM_NEEMP_DIR",
+        "/Volumes/RescueCopy/Downloads/de-uoa-matlab/neemp/examples",
+    )
+)
 
 
 def main(set_id: str, n_mols: int, seed: int = 42) -> None:

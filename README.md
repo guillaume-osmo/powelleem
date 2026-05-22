@@ -30,6 +30,26 @@ overall fitting protocol used here. This package adds:
 pip install "powelleem[all]"
 ```
 
+### Linux deployment (multiprocessing speedup)
+
+On macOS the Accelerate framework is not fork-safe, so multiprocessing is
+fragile (see [src/powelleem/parallel.py](src/powelleem/parallel.py) docstring).
+For full-scale benches (set03 = 17,769 molecules) deploy to a Linux box:
+
+```bash
+# From your laptop:
+scp deploy/run_on_linux.sh user@host:~/
+scp -r ~/path/to/de-uoa-matlab/neemp/examples user@host:~/neemp-data
+ssh user@host 'bash run_on_linux.sh'
+```
+
+The script installs miniconda + clones this repo + runs:
+
+- `examples/07_parallel_bench.py` — parallel-speedup measurement
+- `examples/06_scale_denewton_only.py` — full set03 DENewton on 17k mol
+
+
+
 ```python
 from powelleem import EEMModel, load_chaos
 from powelleem.solvers import AnalyticLM
