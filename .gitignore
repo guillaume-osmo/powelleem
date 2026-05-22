@@ -49,9 +49,10 @@ docs/_build/
 .ipynb_checkpoints/
 
 # Project-local
-results/
+/results/
 *.log
 *.npz
 !tests/data/*.npz
+!benchmarks/**/results/
 local_data/
 scratch/
