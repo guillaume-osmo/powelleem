@@ -1,0 +1,7 @@
+Loading NEEMP set03 17 769 mol…
+  17769 mols, 821418 atoms, 15 types
+  train: 14216 mols (659105 atoms)
+  test : 3553 mols (162313 atoms)
+Loading CHAOS iodine subset (500 mol)…
+  500 mols, 9109 atoms, 13 types
+OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.

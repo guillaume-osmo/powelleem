@@ -164,6 +164,45 @@ class Dataset:
             metadata=dict(self.metadata),
         )
 
+    def split(
+        self,
+        test_fraction: float = 0.2,
+        seed: int = 42,
+    ) -> tuple[Dataset, Dataset]:
+        """Random train/test split for generalisation testing.
+
+        Parameters
+        ----------
+        test_fraction
+            Fraction of molecules to put into the held-out test set.
+        seed
+            RNG seed for reproducibility.
+
+        Returns
+        -------
+        (train, test) — two :class:`Dataset` instances sharing the same
+        ``atom_types`` vocabulary and metadata, so a model fitted on
+        ``train`` can be evaluated directly on ``test``.
+        """
+        rng = np.random.default_rng(seed)
+        perm = rng.permutation(self.n_mols)
+        n_test = int(self.n_mols * test_fraction)
+        test_idx = sorted(perm[:n_test].tolist())
+        train_idx = sorted(perm[n_test:].tolist())
+        train = Dataset(
+            molecules=[self.molecules[i] for i in train_idx],
+            atom_types=self.atom_types,
+            name=f"{self.name}[train{1 - test_fraction:.0%}]",
+            metadata={**self.metadata, "split": "train", "seed": seed},
+        )
+        test = Dataset(
+            molecules=[self.molecules[i] for i in test_idx],
+            atom_types=self.atom_types,
+            name=f"{self.name}[test{test_fraction:.0%}]",
+            metadata={**self.metadata, "split": "test", "seed": seed},
+        )
+        return train, test
+
 
 @dataclass(slots=True)
 class FitResult:
