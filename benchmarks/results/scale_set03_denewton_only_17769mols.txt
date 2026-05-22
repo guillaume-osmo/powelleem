@@ -17761,3 +17761,33 @@ Loading NEEMP set03 (limit=17769)…
 DE configuration: pop=15, gen=7
 
 Running DENewton…
+
+=== DENewton on set03 (17769 mols) ===
+  RMSE              : 0.05423
+  κ (NEEMP ref 0.5125): 0.4509
+  Wall total        : 2362.3s
+  Stage 1 (DE) wall : 372.8s  (120 evals)
+  Stage 2 (Newton)  : 1939.0s
+  Stage1 RMSE       : 0.80233
+
+Per-element fitted parameters:
+        type           α           β
+        Br-1      2.3685      0.7030
+         C-1      2.4553      0.5778
+       C-1.5      2.4720      0.5805
+         C-2      2.4325      0.5704
+         C-3      2.3829      0.7281
+        Cl-1      2.4218      0.8978
+         F-1      2.7720      0.8630
+         H-1      2.2974      1.0000
+         N-1      2.7117      0.8673
+       N-1.5      2.6990      0.8493
+         N-2      2.5436      0.5892
+         N-3      2.5600      0.7375
+         O-1      2.8821      0.9856
+       O-1.5      2.7338      0.8351
+         O-2      2.6679      0.6806
+         P-2      1.9228      0.5691
+         S-1      2.2932      0.9325
+       S-1.5      2.1674      0.9796
+         S-2      2.3465      0.4111

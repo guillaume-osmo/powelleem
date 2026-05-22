@@ -174,6 +174,29 @@ def _z_to_symbol(z: int) -> str:
 # NEEMP legacy loader (Račkov 2016) — .chg / .typ / .sdf triplet
 # ---------------------------------------------------------------------------
 
+def _strip_name_prefix(name: str) -> str:
+    """Normalise mol-name conventions across NEEMP set variants.
+
+    * set01 names look like ``NSC_100000`` → kept as-is (SDF agrees).
+    * set02 names look like ``N000`` or ``N00C`` (chg/typ) vs bare ``000``
+      / ``00C`` (sdf) — strip the leading ``N`` whenever the suffix is
+      pure alphanumeric (no underscore, no further punctuation).
+    * set03 names look like ``NAME:000`` (chg/typ) vs bare ``000`` (sdf)
+      → strip the ``NAME:`` prefix.
+    """
+    if name.upper().startswith("NAME:"):
+        return name.split(":", 1)[1].strip()
+    # set02-style: starts with N and the suffix is alphanumeric only (no underscore).
+    if (
+        name.startswith("N")
+        and len(name) > 1
+        and name[1:].isalnum()
+        and "_" not in name
+    ):
+        return name[1:]
+    return name
+
+
 def _parse_neemp_chg(path: Path) -> dict[str, NDArray[np.float64]]:
     """Parse a NEEMP ``.chg`` file.
 
@@ -205,8 +228,9 @@ def _parse_neemp_chg(path: Path) -> dict[str, NDArray[np.float64]]:
         if not line or line == "$$$$":
             i += 1
             continue
-        # Normalise: strip "NAME:" prefix (set03) so chg/typ keys match SDF names.
-        name = line.split(":", 1)[1].strip() if line.upper().startswith("NAME:") else line
+        # Normalise: strip ``NAME:`` (set03) and bare ``N`` prefix (set02) so
+        # chg/typ keys match the SDF's bare numeric names.
+        name = _strip_name_prefix(line)
         i += 1
         # Next non-blank, non-separator line is the atom count, optionally
         # prefixed with "NATO:" (set03 uses both ``9`` and ``NATO:53`` forms).
@@ -260,8 +284,8 @@ def _parse_neemp_typ(path: Path) -> dict[str, list[tuple[str, str]]]:
         if not line or line == "$$$$":
             i += 1
             continue
-        # Normalise: strip "NAME:" prefix (set03)
-        name = line.split(":", 1)[1].strip() if line.upper().startswith("NAME:") else line
+        # Normalise across set01/set02/set03 conventions.
+        name = _strip_name_prefix(line)
         i += 1
         atoms: list[tuple[str, str]] = []
         while i < len(lines):
