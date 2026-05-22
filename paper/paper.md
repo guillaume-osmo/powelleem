@@ -207,8 +207,8 @@ defines 95 chemical-environment-aware atom types covering hybridisation,
 formal charge, ring size, neighbour identity, and other contextual
 features; RDKit exposes them via `MMFFGetMoleculeProperties`.
 
-Fitting `set03[:200]` with both typings (`mol_rmsd` loss, otherwise
-identical solver settings):
+A small-scale probe shows the expected pattern.  Fitting `set03[:200]`
+with both typings (`mol_rmsd` loss, otherwise identical solver settings):
 
 | Typing             | T  | RMSD   | R²     | D_avg  | D_max  | Wall |
 |---|---:|---:|---:|---:|---:|---:|
@@ -216,10 +216,23 @@ identical solver settings):
 | **MMFF94 (RDKit)** | **43** | **0.0424** | **0.9854** | **0.0293** | **0.1393** | 8.4 s |
 | Δ                  | +28| **−24.6 %** | +1.0 % | **−29.6 %** | −17.6 % | 4.4× |
 
-With 17,769 molecules × ~50 atoms / mol ≈ 800,000 atoms, even 95-class
-MMFF94 gives \(\sim\) 8,400 atoms / parameter — overfitting is not a
-concern.  Full-set03 MMFF94 refit is left to a forthcoming companion
-study.
+At full `set03` scale (17,768 molecules, 821,418 atoms) the MMFF94
+typing expands to 64 distinct classes (P = 1 + 2 × 64 = 129
+parameters), of which several are populated by fewer than 100 atoms —
+under-identified relative to the global κ.  Naive DE+Newton fits from
+random initial conditions consistently diverge to the κ boundary,
+indicating that the analytical-Hessian Newton polish lacks the basin
+information it needs in the higher-dimensional space.
+
+Promising mitigations (warm-start the MMFF94 parameters from the
+NEEMP-15 fit by element matching; merge under-populated MMFF types
+into the dominant neighbour; switch to a regularised Tikhonov-style
+loss penalising deviation from the NEEMP-15 baseline) are subject of
+follow-up work and are not reported here.  The headline NEEMP-15 result
+already establishes the analytical-Hessian polish's advantage; the
+MMFF94 typing experiment confirms that the methodology generalises but
+exposes a real obstacle (under-identified parameters in low-population
+classes) that needs care.
 
 
 # 5. Implementation
