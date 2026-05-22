@@ -288,6 +288,112 @@ def _parse_neemp_typ(path: Path) -> dict[str, list[tuple[str, str]]]:
     return out
 
 
+_DEFAULT_CACHE_DIR = Path.home() / ".cache" / "powelleem" / "neemp"
+
+
+def _neemp_cache_key(sdf: Path, chg: Path, typ: Path, limit: int | None) -> str:
+    import hashlib
+
+    h = hashlib.blake2b(digest_size=16)
+    for p in (sdf, chg, typ):
+        st = p.stat()
+        h.update(str(p).encode())
+        h.update(str(st.st_size).encode())
+        h.update(str(int(st.st_mtime_ns)).encode())
+    h.update(str(limit).encode())
+    return h.hexdigest()
+
+
+def _save_dataset_npz(ds: Dataset, path: Path) -> None:
+    """Serialise a :class:`Dataset` as a single .npz (much faster than pickle).
+
+    Layout: flat concatenated atom-axis arrays + per-mol offsets + atom-type
+    vocabulary + per-mol scalars + per-mol metadata.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    n_mols = ds.n_mols
+    n_atoms = np.array([m.n_atoms for m in ds.molecules], dtype=np.int64)
+    offsets = np.concatenate([[0], np.cumsum(n_atoms)]).astype(np.int64)
+
+    atom_types_flat = np.concatenate(
+        [m.atom_types for m in ds.molecules], dtype=np.int64
+    )
+    target_q_flat = np.concatenate(
+        [m.target_charges for m in ds.molecules], dtype=np.float64
+    )
+    formal_q = np.array([m.formal_charge for m in ds.molecules], dtype=np.float64)
+
+    # Per-mol inv_r matrices: flatten with offsets in a second array.
+    inv_r_flat = np.concatenate(
+        [m.inv_r.reshape(-1) for m in ds.molecules], dtype=np.float64
+    )
+    inv_r_offsets = np.concatenate(
+        [[0], np.cumsum([m.inv_r.size for m in ds.molecules])]
+    ).astype(np.int64)
+
+    smiles = np.array([m.smiles for m in ds.molecules], dtype=object)
+    mol_names = np.array(
+        [str(m.metadata.get("name", "")) for m in ds.molecules], dtype=object
+    )
+    atom_type_strs = np.array(ds.atom_types, dtype=object)
+
+    np.savez(
+        path,
+        n_atoms=n_atoms,
+        offsets=offsets,
+        atom_types_flat=atom_types_flat,
+        target_q_flat=target_q_flat,
+        formal_q=formal_q,
+        inv_r_flat=inv_r_flat,
+        inv_r_offsets=inv_r_offsets,
+        smiles=smiles,
+        mol_names=mol_names,
+        atom_type_strs=atom_type_strs,
+        name=np.array(ds.name, dtype=object),
+        metadata_keys=np.array(list(ds.metadata.keys()), dtype=object),
+        metadata_vals=np.array([str(v) for v in ds.metadata.values()], dtype=object),
+    )
+
+
+def _load_dataset_npz(path: Path) -> Dataset:
+    """Inverse of :func:`_save_dataset_npz`. Reconstructs the full Dataset."""
+    d = np.load(path, allow_pickle=True)
+    n_atoms = d["n_atoms"]
+    offsets = d["offsets"]
+    atom_types_flat = d["atom_types_flat"]
+    target_q_flat = d["target_q_flat"]
+    formal_q = d["formal_q"]
+    inv_r_flat = d["inv_r_flat"]
+    inv_r_offsets = d["inv_r_offsets"]
+    smiles = d["smiles"]
+    mol_names = d["mol_names"]
+    atom_type_strs = tuple(str(s) for s in d["atom_type_strs"])
+
+    molecules: list[MoleculeData] = []
+    for i in range(len(n_atoms)):
+        n = int(n_atoms[i])
+        inv_r = inv_r_flat[inv_r_offsets[i] : inv_r_offsets[i + 1]].reshape(n, n)
+        molecules.append(
+            MoleculeData(
+                smiles=str(smiles[i]),
+                atom_types=atom_types_flat[offsets[i] : offsets[i + 1]],
+                inv_r=inv_r,
+                target_charges=target_q_flat[offsets[i] : offsets[i + 1]],
+                formal_charge=float(formal_q[i]),
+                metadata={"source": "NEEMP", "name": str(mol_names[i])},
+            )
+        )
+
+    meta_keys = [str(k) for k in d["metadata_keys"]]
+    meta_vals = [str(v) for v in d["metadata_vals"]]
+    return Dataset(
+        molecules=molecules,
+        atom_types=atom_type_strs,
+        name=str(d["name"]),
+        metadata=dict(zip(meta_keys, meta_vals, strict=True)),
+    )
+
+
 def load_neemp(
     sdf_path: str | Path,
     chg_path: str | Path,
@@ -295,6 +401,8 @@ def load_neemp(
     *,
     name: str = "NEEMP",
     limit: int | None = None,
+    cache_dir: str | Path | None = _DEFAULT_CACHE_DIR,
+    use_cache: bool = True,
 ) -> Dataset:
     """Load a NEEMP-format dataset: SDF + ``.chg`` + ``.typ`` triplet.
 
@@ -302,8 +410,28 @@ def load_neemp(
     ``(element, bond_order_class)`` (e.g. ``"C-1"``, ``"C-1.5"``, ``"O-2"``).
     The bond-order class comes straight from the ``.typ`` file.
 
-    Requires RDKit for SDF parsing.
+    Caching
+    -------
+    SDF parsing + ``inv_r`` matrix construction is dominated by RDKit
+    (set03 17,769 mol takes ~6 min). On first load we serialise the
+    fully-parsed dataset as an NPZ in ``cache_dir`` keyed by the source
+    files' (size, mtime); subsequent loads of the same dataset complete
+    in < 5 s. Pass ``use_cache=False`` to disable, or ``cache_dir=None``
+    to skip caching entirely.
+
+    Requires RDKit for SDF parsing (only on cache miss).
     """
+    sdf_path = Path(sdf_path)
+    chg_path = Path(chg_path)
+    typ_path = Path(typ_path)
+
+    # ---- Try cache first ----
+    cache_path: Path | None = None
+    if use_cache and cache_dir is not None:
+        cache_path = Path(cache_dir) / f"{_neemp_cache_key(sdf_path, chg_path, typ_path, limit)}.npz"
+        if cache_path.exists():
+            return _load_dataset_npz(cache_path)
+
     try:
         from rdkit import Chem
     except ImportError as exc:  # pragma: no cover
@@ -311,10 +439,6 @@ def load_neemp(
             "RDKit is required for the NEEMP loader. "
             "Install with `pip install powelleem[rdkit]`."
         ) from exc
-
-    sdf_path = Path(sdf_path)
-    chg_path = Path(chg_path)
-    typ_path = Path(typ_path)
 
     charges_by_name = _parse_neemp_chg(chg_path)
     types_by_name = _parse_neemp_typ(typ_path)
@@ -364,7 +488,7 @@ def load_neemp(
             )
         )
 
-    return Dataset(
+    ds = Dataset(
         molecules=molecules,
         atom_types=type_strs,
         name=name,
@@ -376,6 +500,15 @@ def load_neemp(
             "n_loaded": len(molecules),
         },
     )
+
+    # ---- Save cache on miss ----
+    if cache_path is not None:
+        try:
+            _save_dataset_npz(ds, cache_path)
+        except Exception:  # pragma: no cover
+            pass  # cache write is best-effort
+
+    return ds
 
 
 # Back-compat alias
