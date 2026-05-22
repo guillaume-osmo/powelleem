@@ -31,6 +31,7 @@ from powelleem.solvers import (
     Bobyqa,
     DEHybrid,
     JaxAdam,
+    JaxAdaMuon,
     JaxLM,
     Newuoa,
     SolverConfig,
@@ -69,6 +70,7 @@ def main(n_mols: int = 50, seed: int = 42, skip_de: bool = True, de_timeout_s: f
         ("Bobyqa",         Bobyqa(config=config, max_fev=3000)),
         ("JaxLM",          JaxLM(config=config, maxiter_lbfgs=100, maxiter_lm=100)),
         ("JaxAdam",        JaxAdam(config=config, n_iterations=500, learning_rate=0.02)),
+        ("JaxAdaMuon",     JaxAdaMuon(config=config, n_iterations=500, learning_rate=0.05)),
     ]
     if not skip_de:
         solvers.append(

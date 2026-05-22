@@ -187,6 +187,63 @@ def loss_grad_hessian(
     return loss, grad, H
 
 
+def loss_hessian_jax(
+    x: NDArray[np.float64],
+    dataset: Dataset,
+    n_types: int,
+) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
+    """JAX autodiff Hessian — cross-check for the analytical version.
+
+    Builds the loss function with the JAX backend then takes
+    ``jax.hessian(loss)``. Substantially slower than the analytical
+    routine because reverse-over-reverse autodiff re-traces the
+    ``jnp.linalg.solve`` for every Hessian entry, but exercises the same
+    forward kernel so any discrepancy indicates a bug in one of the two
+    routes.
+    """
+    try:
+        import jax
+        import jax.numpy as jnp
+        # Enable float64 — by default JAX uses float32 which is too coarse for
+        # numerical comparison with the float64 analytical routine.
+        jax.config.update("jax_enable_x64", True)
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "JAX is required for the autodiff Hessian. "
+            "Install with `pip install powelleem[jax]`."
+        ) from exc
+
+    from powelleem.model import predict_charges_jax_factory
+
+    predict_one = predict_charges_jax_factory(n_types)
+    blocks = tuple(
+        (
+            jnp.asarray(m.inv_r),
+            jnp.asarray(m.atom_types),
+            jnp.asarray(m.target_charges),
+            float(m.formal_charge),
+            int(m.n_atoms),
+        )
+        for m in dataset.molecules
+    )
+
+    def loss_fn(z):  # type: ignore[no-untyped-def]
+        total = 0.0
+        n_total = 0
+        for inv_r, type_idx, target, q_tot, n in blocks:
+            q = predict_one(z, inv_r, type_idx, q_tot, n)
+            diff = q - target
+            total = total + jnp.sum(diff * diff)
+            n_total += n
+        return total / n_total
+
+    x_j = jnp.asarray(x, dtype=jnp.float64)
+    loss_v = float(jax.jit(loss_fn)(x_j))
+    grad_v = np.asarray(jax.jit(jax.grad(loss_fn))(x_j))
+    hess_v = np.asarray(jax.jit(jax.hessian(loss_fn))(x_j))
+    return loss_v, grad_v, hess_v
+
+
 def check_hessian(
     x: NDArray[np.float64],
     dataset: Dataset,

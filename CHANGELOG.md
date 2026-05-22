@@ -35,6 +35,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `benchmarks/results/neemp_set01_30mols_7solvers_with_newton.txt` — full
   7-solver benchmark showing the Hessian-aware solver finds the published
   κ at the cost of 3.6 s wall (1.7× AnalyticLM).
+- **`JaxAdaMuon`** solver — AdaMuon (Liu et al. 2025) implemented in JAX.
+  Combines Adam-style per-coordinate adaptive scaling with Muon's
+  orthogonalisation step (Jordan 2024). For our 1+2T-dim parameter vector
+  the Newton-Schulz iteration on a matrix degenerates to a single
+  L2-normalisation of the (Adam-scaled) momentum. The resulting direction
+  is multiplied by ``lr * sqrt(P)`` to keep per-coordinate step magnitudes
+  comparable to Adam.
+- **`loss_hessian_jax`** — JAX autodiff Hessian via ``jax.hessian``,
+  used to cross-validate the analytical Hessian. Forces float64
+  (``jax_enable_x64=True``) since float32 cross-check fails at ~1e-6.
+- 8-solver benchmark on NEEMP set01: DEHybrid wins on RMSE (0.094), but
+  **JaxAdaMuon reaches RMSE 0.198 in 5 s** — 2nd best overall and 13×
+  faster than DEHybrid. Three loss basins are now resolved at κ ≈ 0.01,
+  0.5 (≈ NEEMP ref), and 1.4–2.2.
 
 ## [0.1.0a0] — 2026-05-22
 
