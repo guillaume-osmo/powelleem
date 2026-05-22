@@ -1,0 +1,54 @@
+/Users/guillaume-osmo/miniconda3/envs/osmo/lib/python3.11/site-packages/pdfo/_common.py:2512: Warning: prepdfo: x0 is revised so that the distance between x0 and the inactive bounds is at least radius_init; set options[Options.HONOUR_X0.value]=True if you prefer to keep x0.
+  warnings.warn(warn_message, Warning)
+Loading NEEMP set01 (limit=30)…
+  → 30 mols, 1068 atoms, 12 types: ('C-1', 'C-1.5', 'C-2', 'H-1', 'N-1', 'N-1.5', 'N-2', 'O-1', 'O-2', 'S-1', 'S-1.5', 'S-2')
+  load time: 0.7s
+Reference parameter file: CCD_gen_DE_RMSD_B3LYP_6311G_NPA.par
+
+=== AnalyticLM ===
+  RMSE = 0.36861    wall = 1.38s    loss0 = 87.17690    nfev = 269
+
+=== AnalyticNewton ===
+  RMSE = 0.36557    wall = 3.63s    loss0 = 87.17690    nfev = 319
+
+=== Newuoa ===
+  RMSE = 0.36633    wall = 7.37s    loss0 = 87.17690    nfev = 3001
+
+=== Bobyqa ===
+  RMSE = 0.39694    wall = 7.38s    loss0 = 87.17690    nfev = 3002
+
+=== JaxLM ===
+  RMSE = 0.36337    wall = 20.23s    loss0 = 87.17950    nfev = 216
+
+=== JaxAdam ===
+  RMSE = 0.69859    wall = 6.09s    loss0 = 87.17950    nfev = 500
+
+=== DEHybrid ===
+  RMSE = 0.09410    wall = 54.84s    loss0 = 30.70398    nfev = 330
+
+======================================================================
+Solver               RMSE    wall(s)        κ    #nfev
+----------------------------------------------------------------------
+DEHybrid          0.09410      54.52   0.4398      330
+JaxLM             0.36337      17.84   1.8246      216
+AnalyticNewton    0.36557       3.62   0.5288      319
+Newuoa            0.36633       7.36   1.9444     3001
+AnalyticLM        0.36861       1.37   1.3913      269
+Bobyqa            0.39694       7.37   2.1934     3002
+JaxAdam           0.69859       4.49   2.0421      500
+
+AnalyticLM fitted parameters (the reference solver):
+  κ = 1.3913    (NEEMP CCD_gen reference: κ = 0.5125)
+      type    α (fitted)    β (fitted)
+       C-1        2.4595        0.7419
+     C-1.5        2.5116        0.0238
+       C-2        2.5802        0.0897
+       H-1        2.5232        0.2835
+       N-1        2.4380        0.4908
+     N-1.5        2.4588        0.8950
+       N-2        2.5192        0.6623
+       O-1        2.4260        0.3627
+       O-2        2.4134        0.1672
+       S-1        2.4806        0.7158
+     S-1.5        2.4270        0.9718
+       S-2        2.6595        0.9935

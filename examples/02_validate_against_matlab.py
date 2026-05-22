@@ -27,6 +27,7 @@ from powelleem import EEMModel
 from powelleem.data import load_neemp
 from powelleem.solvers import (
     AnalyticLM,
+    AnalyticNewton,
     Bobyqa,
     DEHybrid,
     JaxAdam,
@@ -46,7 +47,7 @@ REF_PAR = Path(
 )
 
 
-def main(n_mols: int = 50, seed: int = 42, skip_de: bool = True) -> None:
+def main(n_mols: int = 50, seed: int = 42, skip_de: bool = True, de_timeout_s: float = 300.0) -> None:
     print(f"Loading NEEMP set01 (limit={n_mols})…")
     t0 = time.perf_counter()
     ds = load_neemp(SDF, CHG, TYP, limit=n_mols, name="NEEMP-set01")
@@ -62,26 +63,31 @@ def main(n_mols: int = 50, seed: int = 42, skip_de: bool = True) -> None:
     config = SolverConfig(seed=seed)
 
     solvers: list = [
-        ("AnalyticLM", AnalyticLM(config=config, maxiter_lbfgs=100, maxiter_lm=100)),
-        ("Newuoa",     Newuoa(config=config, max_fev=3000)),
-        ("Bobyqa",     Bobyqa(config=config, max_fev=3000)),
-        ("JaxLM",      JaxLM(config=config, maxiter_lbfgs=100, maxiter_lm=100)),
-        ("JaxAdam",    JaxAdam(config=config, n_iterations=500, learning_rate=0.02)),
+        ("AnalyticLM",     AnalyticLM(config=config, maxiter_lbfgs=100, maxiter_lm=100)),
+        ("AnalyticNewton", AnalyticNewton(config=config, maxiter_lbfgs=100, maxiter_newton=100)),
+        ("Newuoa",         Newuoa(config=config, max_fev=3000)),
+        ("Bobyqa",         Bobyqa(config=config, max_fev=3000)),
+        ("JaxLM",          JaxLM(config=config, maxiter_lbfgs=100, maxiter_lm=100)),
+        ("JaxAdam",        JaxAdam(config=config, n_iterations=500, learning_rate=0.02)),
     ]
     if not skip_de:
         solvers.append(
-            ("DEHybrid", DEHybrid(config=config, population_size=50, n_generations=20))
+            ("DEHybrid", DEHybrid(config=config, population_size=30, n_generations=10))
         )
 
     results = []
     for name, solver in solvers:
         print(f"=== {name} ===")
         t0 = time.perf_counter()
+        # Soft per-solver wall-clock budget — used to display a warning,
+        # not to interrupt mid-run (interrupting NumPy/JAX cleanly is brittle).
+        budget = de_timeout_s if name == "DEHybrid" else 60.0
         try:
             res = solver.fit(model, ds)
             wall = time.perf_counter() - t0
+            tag = "" if wall < budget else f" [over budget {budget:.0f}s]"
             print(
-                f"  RMSE = {res.rmse:.5f}    wall = {wall:.2f}s    "
+                f"  RMSE = {res.rmse:.5f}    wall = {wall:.2f}s{tag}    "
                 f"loss0 = {res.loss_initial:.5f}    nfev = {res.n_function_evals}"
             )
             results.append((name, res))

@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `benchmarks/results/neemp_set01_30mols_first_validation.txt` — first
   benchmark log: all 5 non-DE solvers converge on real B3LYP/6-311G NPA
   reference charges. AnalyticLM is 5× faster than NEWUOA at comparable RMSE.
+- **`powelleem.hessian`** — analytical Hessian of the EEM sum-of-squares
+  loss via the implicit-function theorem applied twice. Cost is one extra
+  LU back-substitution per (κ–κ, κ–α_k, κ–β_k, α_j–β_k, β_j–β_k) pair
+  per molecule, on the matrix already factorised by the forward pass.
+- **`AnalyticNewton`** solver — L-BFGS-B warm start + SciPy
+  ``trust-exact`` Newton with the full analytical Hessian. On NEEMP set01
+  it finds κ ≈ 0.53, matching the published NEEMP reference (κ = 0.5125),
+  while AnalyticLM (Gauss-Newton / no curvature) stays trapped in a
+  local basin at κ ≈ 1.39. The full Hessian's directional information
+  escapes the κ-α coupling that flattens the loss along α-only directions.
+- `benchmarks/results/neemp_set01_30mols_7solvers_with_newton.txt` — full
+  7-solver benchmark showing the Hessian-aware solver finds the published
+  κ at the cost of 3.6 s wall (1.7× AnalyticLM).
 
 ## [0.1.0a0] — 2026-05-22
 
