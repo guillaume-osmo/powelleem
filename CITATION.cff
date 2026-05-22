@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite both the software and the underlying
+  papers (NEEMP, MMFF94, NEWUOA/BOBYQA references).
+type: software
+title: 'powelleem: EEM parameter fitting with analytical Jacobian and Powell solvers'
+version: 0.1.0a0
+date-released: '2026-05-22'
+authors:
+  - family-names: Godin
+    given-names: Guillaume
+license: MIT
+url: 'https://github.com/guillaume-godin/powelleem'
+repository-code: 'https://github.com/guillaume-godin/powelleem'
+abstract: >-
+  A modern Python implementation of the Electronegativity Equalization Method
+  parameter fitting pipeline, with an analytical Jacobian (via the implicit
+  function theorem), six interchangeable solvers (NumPy + LM, NEWUOA, BOBYQA,
+  JAX + Adam, JAX + LM, and a DE/NEWUOA hybrid that reproduces the original
+  MATLAB DE_UOA_FINAL pipeline), and a statistical benchmark harness.
+keywords:
+  - EEM
+  - electronegativity equalization
+  - partial charges
+  - NEWUOA
+  - BOBYQA
+  - Levenberg-Marquardt
+  - molecular descriptors
+  - RDKit
+  - MMFF94
+preferred-citation:
+  type: article
+  title: 'powelleem: a modern Python EEM parameter fitter (in preparation)'
+  authors:
+    - family-names: Godin
+      given-names: Guillaume
+  year: 2026
