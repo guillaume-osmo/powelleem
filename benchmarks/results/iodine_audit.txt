@@ -1,0 +1,42 @@
+Loading CHAOS iodine subset (cached)…
+  763 mols, 13042 atoms, 16 types
+
+Re-streaming CHAOS for SMILES (to feed RDKit)…
+  SMILES extracted for 763/763 mols (4.9s)
+
+Fitting CHAOS iodine subset (mol_rmsd) for per-atom error…
+OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+  κ=0.1955, total RMSD=0.1013
+  per-element I: RMSD=0.1662
+
+=== Iodine environment distribution (total 857 I atoms classified, 0 unclassified) ===
+                   env   count    mean_err      rmsd   mean_qref  mean_qpred
+               I_sp3_C     441     -0.0059    0.0610     -0.1736     -0.1795
+              I_aryl_C     227     -0.1073    0.1118     -0.0902     -0.1975
+               I_sp2_C      67     -0.0646    0.1056     -0.1183     -0.1829
+              I_sp3_Si      47     +0.0116    0.0478     -0.3562     -0.3446
+              I_sp3_Ge      28     -0.0268    0.0444     -0.3124     -0.3392
+                I_sp_C      15     -0.3513    0.3525     +0.1401     -0.2112
+               I_sp3_P       5     +0.1344    0.1346     -0.2474     -0.1130
+               I_sp3_O       5     -0.8872    0.9891     +1.6235     +0.7362
+               I_sp2_O       4     -0.8918    1.0731     +1.0693     +0.1775
+               I_sp2_B       3     -0.0001    0.0002     -0.3514     -0.3515
+              I_sp3_Cl       2     -0.7148    0.9795     +0.9953     +0.2806
+               I_sp3_F       2     -1.1175    1.5363     +1.8349     +0.7174
+               I_sp3_I       2     +0.0000    0.0000     +0.0000     +0.0000
+              I_sp2_In       2     -0.0000    0.0000     -0.4322     -0.4322
+           I_other_H_S       2     -0.0914    0.0914     -0.0378     -0.1292
+              I_sp3_Br       1     +0.0000    0.0000     +0.1459     +0.1459
+               I_sp3_N       1     -0.2053    0.2053     +0.3516     +0.1464
+              I_sp3_As       1     +0.1991    0.1991     -0.2080     -0.0089
+  I_other_H_UNSPECIFIED       1     -0.0914    0.0914     -0.0378     -0.1292
+               I_sp2_N       1     -0.2765    0.2765     +0.1698     -0.1067
+
+=== Top 20 worst-fit iodine atoms ===
+Traceback (most recent call last):
+  File "/Users/guillaume-osmo/Github/powelleem/examples/12_iodine_audit.py", line 165, in <module>
+    main()
+  File "/Users/guillaume-osmo/Github/powelleem/examples/12_iodine_audit.py", line 159, in main
+    print(f"  {'|err|':>8s}  {'env':>20s}  {'chaos_id':>12s}  {'atom_i':>6s}  {'qref':>+8s}  {'qpred':>+8s}")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Sign not allowed in string format specifier

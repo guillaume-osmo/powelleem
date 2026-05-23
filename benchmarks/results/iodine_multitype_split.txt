@@ -1,0 +1,28 @@
+Loading CHAOS iodine subset (cached)…
+  763 mols, 13042 atoms, 16 types
+Streaming CHAOS for SMILES…
+  Got SMILES for 763/763
+Rebuilding dataset with split-I typing…
+  763 mols (skipped 0), 20 types
+  vocabulary: ('H', 'B', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl', 'Z32', 'As', 'Se', 'Br', 'Z49', 'I_aryl', 'I_other', 'I_sp', 'I_sp2', 'I_sp3')
+
+--- Fitting single-I ---
+OMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+  P=33  κ=0.2840  wall=3.7s
+  TRAIN: RMSD=0.0923  R=0.8681  D_avg=0.0686
+  TEST : RMSD=0.1053  R=0.8648  D_avg=0.0763  Δ=+14.0%
+  Iodine subtypes (test set):
+          type         α         β      n      RMSD         R
+             I    2.7554    0.5881    172    0.1742    0.7844
+
+--- Fitting split-I ---
+  P=41  κ=0.3323  wall=4.4s
+  TRAIN: RMSD=0.0895  R=0.8786  D_avg=0.0670
+  TEST : RMSD=0.0890  R=0.8873  D_avg=0.0668  Δ=-0.5%
+  Iodine subtypes (test set):
+          type         α         β      n      RMSD         R
+        I_aryl    2.6860    0.9952     47    0.0659    0.8094
+       I_other    2.5716    0.8205      2    0.0002    0.0000
+          I_sp    2.3781    0.8031      3    0.0434   -0.7279
+         I_sp2    2.6360    0.8696     10    0.1983    0.3823
+         I_sp3    2.7208    0.7974    110    0.2043    0.8442

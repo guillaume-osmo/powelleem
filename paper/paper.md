@@ -284,6 +284,42 @@ These iodine parameters are available as
 plugged into any RDKit-based EEM pipeline as a drop-in for the missing
 NEEMP CCD_gen iodine entry.
 
+### 3.5.1 Splitting iodine by chemical environment
+
+An environment audit (``examples/12_iodine_audit.py``) revealed three
+large iodine populations within the single ``I`` element class:
+
+| Sub-environment | Count | Per-atom RMSD | Mean q_ref |
+|---|---:|---:|---:|
+| I_sp3 (alkyl)   | 441 | 0.061 | −0.174 |
+| I_aryl          | 227 | 0.112 | −0.090 |
+| I_sp2 (vinyl)   | 67  | 0.106 | −0.118 |
+| ≤ 5 rare classes (Si/Ge/anion/oxidized) | ≤ 15 each | varied | varied |
+
+The single ``I`` class collapses these into a compromise prediction
+(≈ −0.19 e for every iodine atom), under-fitting the aryl sub-type by
+~0.10 e and severely missing oxidized-iodine outliers (q ≈ +1 e).
+Refitting with five iodine sub-types
+(``I_sp3``, ``I_aryl``, ``I_sp2``, ``I_sp``, ``I_other``) lifts the
+parameter count from 31 to 39 and yields:
+
+| Fit                 | P  | Train RMSD | Test RMSD | Train/test gap |
+|---|---:|---:|---:|---:|
+| Single ``I`` type   | 33 | 0.0923     | 0.1053    | +14.0 %        |
+| 5-way I split       | 41 | 0.0895     | **0.0890**| **−0.5 %**     |
+
+The split lifts test RMSD by 15.5 % and collapses the train/test gap
+from +14 % to essentially zero — a textbook sign that the single-type
+fit was under-specified.  Per-subtype, the aryl iodine RMSD drops from
+0.112 (audit) to 0.066 (split-fit, on the test atoms), confirming that
+the structural distinction is real.
+
+Two avenues for further refinement: (i) split the residual ``I_sp3``
+class into normal alkyl vs oxidized-iodine (≤ 10 atoms total in our
+dataset, with q ≈ +1 e instead of −0.2 e) — though data sparsity makes
+this fragile; (ii) extend the per-environment treatment to other heavy
+halides (Br, At), where similar aryl/alkyl distinctions matter.
+
 
 # 4. Atom typing: NEEMP element+bond-order vs MMFF94
 
